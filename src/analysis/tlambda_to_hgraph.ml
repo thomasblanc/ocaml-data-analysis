@@ -257,8 +257,7 @@ let init ~modulename funs =
           ~mk_tid
           ~modulename
           ~inv:f_in.(0)
-          ~outv:f_out.(0)
-          ~exnv:f_out.(1)
+          ~outv ~exnv
           ~ret_id:f_return ~exn_id:f_exn
           flam;
         Hashtbl.add fun_descs i
