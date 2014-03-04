@@ -217,7 +217,7 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
         g.hedges <- HaS_Map.add (orig_hedge, stack) hedge g.hedges;
         hedge
       in
-      let _subgraph, _input_hedges, _output_hedges = H.clone_subgraph
+      let _subgraph, input_hedges, _output_hedges = H.clone_subgraph
           ~in_graph:function_info.f_graph
           ~out_graph:g.graph
           ~import_vattr:(fun ~old_vertex ~new_vertex:_ ~old_attr ->
@@ -234,7 +234,8 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
           ~output
           function_info.subgraph
       in
-      g.orig_graph <- StackMap.add stack function_info.f_graph g.orig_graph
+      g.orig_graph <- StackMap.add stack function_info.f_graph g.orig_graph;
+      input_hedges
     in
 
     (* TODO: potentially make configurable to be able to not
@@ -243,9 +244,13 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
     if new_call_site
     then begin
       g.call_sites <- add_call_site g stack hedge;
-      link_function g hedge stack function_info;
-    end;
-    new_call_site
+      let input_hedges = link_function g hedge stack function_info in
+      let input_hedges = Array.fold_left
+          (fun acc h -> H.HedgeSet.union (hset_of_hiset h) acc)
+          H.HedgeSet.empty input_hedges in
+      Some input_hedges
+    end
+    else None
 
 end
 
@@ -310,7 +315,7 @@ module Fixpoint (T:T) (M:Manager with module T := T) = struct
     in
     match lift_option_array (Array.map f pred) with
     | None ->
-      M.H.VertexSet.empty, state
+      M.H.VertexSet.empty, M.H.HedgeSet.empty, state
     | Some abstract ->
       let attrib = SG.hedge_attrib state.graph hedge in
       let abstract, functions = M.apply hedge attrib abstract in
@@ -318,21 +323,16 @@ module Fixpoint (T:T) (M:Manager with module T := T) = struct
       let functions = List.map (fun function_id ->
           let f_graph, subgraph = M.find_function function_id in
           { SG.stack_elt = function_id; f_graph; subgraph }) functions in
-      let need_update =
+      let hedges_to_update =
         List.fold_left
           (fun need_update fun_info ->
-             (* do side effects *)
-             let update' = SG.import_function_call state.graph hedge fun_info in
-             need_update || update') false functions in
-      let to_update =
-        if need_update
-        then SG.hedge_pred state.graph hedge
-        else M.H.VertexSet.empty in
-      let to_update =
-        M.H.VertexSet.union
-          to_update
-          (SG.hedge_succ state.graph hedge) in
-      to_update, state
+             match SG.import_function_call state.graph hedge fun_info with
+             | None -> need_update
+             | Some to_update ->
+               M.H.HedgeSet.union to_update need_update)
+          M.H.HedgeSet.empty functions in
+      let vertices_to_update = SG.hedge_succ state.graph hedge in
+      vertices_to_update, hedges_to_update, state
 
 
   let update_vertex narrowing_phase state vertex =
@@ -396,8 +396,10 @@ module Fixpoint (T:T) (M:Manager with module T := T) = struct
         begin match Hwq.pop hwq with
           | None -> state
           | Some h ->
-            let to_update, state = update_hedge state h in
-            Vwq.push_set vwq to_update;
+            let vertices_to_update, hedges_to_update, state =
+              update_hedge state h in
+            Vwq.push_set vwq vertices_to_update;
+            Hwq.push_set hwq hedges_to_update;
             aux state
         end
       | Some v ->
