@@ -120,7 +120,7 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
     | None -> make_vertex g stack orig_vertex
     | Some v -> v
 
-  let make_hedge g stack orig_hedge =
+  let make_hedge ?(get_vertex=get_vertex) g stack orig_hedge =
     let orig_graph = get_orig_graph g stack in
     assert(H.contains_hedge orig_graph orig_hedge);
     let hedge = T.Hedge.clone orig_hedge in
@@ -204,37 +204,71 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
     let attrib = H.hedge_attrib g.graph hedge in
     let stack = Stack.push attrib.stack function_info.stack_elt in
 
-    let link_function g hedge stack function_info =
-      let input = hedge_pred' g hedge in
-      let output = hedge_succ' g hedge in
-      let clone_vertex orig_vertex =
-        let vertex = T.Vertex.clone orig_vertex in
-        g.vertices <- VaS_Map.add (orig_vertex, stack) vertex g.vertices;
-        vertex
-      in
-      let clone_hedge orig_hedge =
-        let hedge = T.Hedge.clone orig_hedge in
-        g.hedges <- HaS_Map.add (orig_hedge, stack) hedge g.hedges;
-        hedge
-      in
-      let _subgraph, input_hedges, _output_hedges = H.clone_subgraph
-          ~in_graph:function_info.f_graph
-          ~out_graph:g.graph
-          ~import_vattr:(fun ~old_vertex ~new_vertex:_ ~old_attr ->
-              { orig_vertex = old_vertex;
-                orig_attrib = old_attr;
-                stack })
-          ~import_hattr:(fun ~old_hedge ~new_hedge:_ ~old_attr ->
-              { orig_hedge = old_hedge;
-                orig_attrib = old_attr;
-                stack })
-          ~clone_vertex
-          ~clone_hedge
-          ~input
-          ~output
-          function_info.subgraph
-      in
+    let link_function g hedge stack ({subgraph} as function_info) =
       g.orig_graph <- StackMap.add stack function_info.f_graph g.orig_graph;
+
+      if Array.length (hedge_pred' g hedge) <> Array.length subgraph.H.sg_input
+      then raise (Invalid_argument "link_function: input and sg_input of different length");
+      if Array.length (hedge_succ' g hedge) <> Array.length subgraph.H.sg_output
+      then raise (Invalid_argument "link_function: output and sg_output of different length");
+
+      Array.iter (fun sg_in ->
+          if H.VertexSet.mem sg_in subgraph.H.sg_vertex
+          then raise (Invalid_argument "link_function: sg_input and sg_vertex are not disjoint"))
+        subgraph.H.sg_input;
+      Array.iter (fun sg_out ->
+          if H.VertexSet.mem sg_out subgraph.H.sg_vertex
+          then raise (Invalid_argument "link_function: sg_output and sg_vertex are not disjoint"))
+        subgraph.H.sg_output;
+
+      let get_vertex' =
+
+        let add_map_vertex callee_vertices call_site_vertices map =
+          List.fold_left2
+            (fun map callee_vertex call_site_vertex ->
+               H.VertexMap.add callee_vertex call_site_vertex map)
+            map
+            (Array.to_list callee_vertices)
+            (Array.to_list call_site_vertices) in
+        let map_vertex =
+          add_map_vertex
+            function_info.subgraph.H.sg_input
+            (hedge_pred' g hedge)
+            H.VertexMap.empty in
+        let map_vertex =
+          add_map_vertex
+            function_info.subgraph.H.sg_output
+            (hedge_succ' g hedge)
+            map_vertex in
+
+        let get_vertex' g stack orig_vertex =
+          try H.VertexMap.find orig_vertex map_vertex
+          with Not_found -> get_vertex g stack orig_vertex
+        in
+        get_vertex'
+      in
+
+      let input_hedges' =
+        Array.fold_left (fun set vertex ->
+            H.HedgeSet.union set (H.vertex_succ function_info.f_graph vertex))
+              H.HedgeSet.empty function_info.subgraph.H.sg_input in
+
+      let output_hedges' =
+        Array.fold_left (fun set vertex ->
+            H.HedgeSet.union set (H.vertex_pred function_info.f_graph vertex))
+              H.HedgeSet.empty function_info.subgraph.H.sg_output in
+
+      let import_hedges set =
+        H.HedgeSet.fold (fun orig_hedge set ->
+            H.HedgeSet.add
+              (make_hedge ~get_vertex:get_vertex' g stack orig_hedge)
+              set)
+          set H.HedgeSet.empty
+      in
+
+      let input_hedges = import_hedges input_hedges' in
+      let _output_hedges = import_hedges output_hedges' in
+
       input_hedges
     in
 
@@ -245,9 +279,6 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
     then begin
       g.call_sites <- add_call_site g stack hedge;
       let input_hedges = link_function g hedge stack function_info in
-      let input_hedges = Array.fold_left
-          (fun acc h -> H.HedgeSet.union (hset_of_hiset h) acc)
-          H.HedgeSet.empty input_hedges in
       Some input_hedges
     end
     else None
