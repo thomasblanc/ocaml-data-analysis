@@ -22,11 +22,19 @@ let () =
       end
       in
       let module Manager = Tlambda_analysis.M ( E ) in
-      (* Print_hgraph.( *)
-      (*   Tlambda_to_hgraph.G.print_dot *)
-      (*     ~print_attrvertex *)
-      (*     ~print_attrhedge *)
-      (*     ppf g); *)
+      begin
+        match !dot_total_bigraph with
+        | None -> ()
+        | Some file ->
+          let oc = open_out ( file ^ ".dot" ) in
+          let ppf = Format.formatter_of_out_channel oc in
+          let open Print_hgraph in
+          Tlambda_to_hgraph.G.print_dot
+            ~print_attrvertex
+            ~print_attrhedge
+            ppf g;
+          close_out oc
+      end;
       let module F = Fixpoint.Fixpoint ( Tlambda_to_hgraph.T ) ( Manager ) in
       print_endline "starting the analysis";
       let result, assotiation_map =
@@ -62,4 +70,13 @@ let () =
           exit 1
         end
 
+    end
+  else
+    begin
+      match !dot_total_bigraph, !dot_file with
+      | None, None -> ()
+      | _, _ ->
+        prerr_endline
+          "Can't export to dot file without going through merging and analysis";
+        exit 12
     end

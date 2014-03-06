@@ -13,9 +13,11 @@ let target_string : string option ref = ref None
 
 let count_apply = ref false
 
-let dot_file = ref None
+let dot_file : string option ref = ref None
 
 let dump_tlambda = ref false
+let dot_bigraphs = ref false
+let dot_total_bigraph : string option ref = ref None
 
 let arg_parser =
   let open Arg in
@@ -41,7 +43,14 @@ let arg_parser =
         " Dumps the result to a dot file");
       ( "-dtlambda",
         Set dump_tlambda,
-        " Dump the produced tlambda in a tml file");
+        " Dump the produced tlambda in a .tml file");
+      ( "-dot-bigraphs",
+        Set dot_bigraphs,
+        " Output the seperated bigraphs produced in .dot files");
+      ( "-dot-total-bigraphs",
+        String ( fun s -> dot_total_bigraph := Some s),
+        " Output the total bigraph to a dot files");
+      
     ]
 
 let handle_file ppf sourcefile =
@@ -58,10 +67,15 @@ let handle_file ppf sourcefile =
     let tlambda = Mk_tlambda.lambda_to_tlambda ~modname:modulename ~funs lambda in
 
     if !dump_tlambda
-    then Format.fprintf ppf "%a@." Print_tlambda.tlambda tlambda;
+    then (Format.fprintf ppf "%a@." Print_tlambda.tlambda tlambda);
 
     let (g,funtbl,vin,vout,vexn,exn_id,return_id) =
       Tlambda_to_hgraph.mk_graph ~modulename funs tlambda in
+
+    if !dot_bigraphs
+    then Print_hgraph . (
+        Tlambda_to_hgraph.G.print_dot
+          ~print_attrvertex ~print_attrhedge ppf g);
 
     Cmb.export g funtbl vin vout vexn outputprefix;
     add_target (cmbise outputprefix)
