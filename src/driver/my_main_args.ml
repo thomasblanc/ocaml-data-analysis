@@ -15,6 +15,8 @@ let count_apply = ref false
 
 let dot_file = ref None
 
+let dump_tlambda = ref false
+
 let arg_parser =
   let open Arg in
   align
@@ -37,6 +39,9 @@ let arg_parser =
       ( "-dot",
         String (fun s -> dot_file := Some s ),
         " Dumps the result to a dot file");
+      ( "-dtlambda",
+        Set dump_tlambda,
+        " Dump the produced tlambda in a tml file");
     ]
 
 let handle_file ppf sourcefile =
@@ -51,8 +56,10 @@ let handle_file ppf sourcefile =
     let funs : ( F.t, Tlambda.tlambda ) Hashtbl.t = Hashtbl.create 1024 in
 
     let tlambda = Mk_tlambda.lambda_to_tlambda ~modname:modulename ~funs lambda in
-    (* Format.fprintf ppf "%a@." *)
-    (*   Print_tlambda.tlambda tlambda; *)
+
+    if !dump_tlambda
+    then Format.fprintf ppf "%a@." Print_tlambda.tlambda tlambda;
+
     let (g,funtbl,vin,vout,vexn,exn_id,return_id) =
       Tlambda_to_hgraph.mk_graph ~modulename funs tlambda in
 
