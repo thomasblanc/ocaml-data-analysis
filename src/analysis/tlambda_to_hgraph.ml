@@ -29,7 +29,7 @@ struct
     incr c;
     modulename, !c
 
-  let clone _ = mk ()
+  let clone (s,_) = mk ~modulename:("#"^s) ()
 end
 
 module Hedge : E =
