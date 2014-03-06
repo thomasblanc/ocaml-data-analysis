@@ -11,8 +11,8 @@ let print_hedge_attribute ppf hattr =
       Format.fprintf ppf "Return"
     | Retexn _ ->
       Format.fprintf ppf "Retexn"
-    | Var _ ->
-      Format.fprintf ppf "Var"
+    | Var v ->
+      TId.print ppf v
     | Const _ ->
       Format.fprintf ppf "Const"
     | Constraint _ ->
@@ -26,7 +26,7 @@ let print_hedge_attribute ppf hattr =
   in
   match hattr with
   | [] -> ()
-  | [_, hinfo] -> aux ppf hinfo
+  | [i, hinfo] -> Format.fprintf ppf "%a <- %a" TId.print i aux hinfo
   | (_, hinfo) :: t ->
     aux ppf hinfo;
     List.iter (fun (_,hinfo) -> Format.fprintf ppf ", %a" aux hinfo)
