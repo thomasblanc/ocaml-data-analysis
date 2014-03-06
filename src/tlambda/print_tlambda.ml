@@ -69,7 +69,16 @@ and tlet ppf tl =
   in
   fprintf ppf "@[<2>%a@]" one tl
 
-and trec trec = failwith "todo print trec"
+and trec ppf { tr_decls; tr_in } =
+  fprintf ppf "@[@[<2>letrec@ ";
+  List.iter (fun ( i, p, args) ->
+      fprintf ppf "@[%a@ =@ %a@ %a@]"
+        TId.print i
+        primitive p
+        id_list args
+    ) tr_decls;
+  fprintf ppf "@] in@ %a@]"
+    tlambda tr_in
 
 and tend ppf tid = fprintf ppf "%a" TId.print tid
 
