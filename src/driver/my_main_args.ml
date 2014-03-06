@@ -51,7 +51,8 @@ let handle_file ppf sourcefile =
     let funs : ( F.t, Tlambda.tlambda ) Hashtbl.t = Hashtbl.create 1024 in
 
     let tlambda = Mk_tlambda.lambda_to_tlambda ~modname:modulename ~funs lambda in
-
+    (* Format.fprintf ppf "%a@." *)
+    (*   Print_tlambda.tlambda tlambda; *)
     let (g,funtbl,vin,vout,vexn,exn_id,return_id) =
       Tlambda_to_hgraph.mk_graph ~modulename funs tlambda in
 

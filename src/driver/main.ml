@@ -22,6 +22,11 @@ let () =
       end
       in
       let module Manager = Tlambda_analysis.M ( E ) in
+      (* Print_hgraph.( *)
+      (*   Tlambda_to_hgraph.G.print_dot *)
+      (*     ~print_attrvertex *)
+      (*     ~print_attrhedge *)
+      (*     ppf g); *)
       let module F = Fixpoint.Fixpoint ( Tlambda_to_hgraph.T ) ( Manager ) in
       print_endline "starting the analysis";
       let result, assotiation_map =
