@@ -9,7 +9,7 @@ module Vertex = struct
   let hash (i:string) = Hashtbl.hash i
   let equal (i:string) j = i = j
 
-  let print ppf s = Format.pp_print_string ppf ("\""^s^"\"")
+  let print ppf s = Format.pp_print_string ppf s
 
   let c = ref 0
   let clone v = Printf.sprintf "%s_%i" v (incr c; !c)
@@ -41,7 +41,7 @@ module Hedge = struct
   let hash (i:t) = Hashtbl.hash i
   let equal (i:t) j = i = j
 
-  let print ppf s = Format.pp_print_string ppf ("\""^s^"\"")
+  let print ppf s = Format.pp_print_string ppf s
   let c = ref 0
   let clone v = Printf.sprintf "%s_%i" v (incr c; !c)
 end
@@ -286,7 +286,13 @@ module Manager = struct
     assert(F.equal id func);
     g_func, func_subgraph
 
-  module Stack = Abstract_stack.TwoLevels ( Function_id )
+  module Function_id' = struct
+    include Function_id
+    let is_important _ = true
+    let n = 3
+  end
+
+  module Stack = Abstract_stack.Leveled ( Function_id' )
 
 end
 
