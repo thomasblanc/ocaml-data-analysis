@@ -146,7 +146,7 @@ type hinfo =
   | Prim of primitive * tid list
   | Constraint of constr
   | App_prep of tid * tid (* function, argument *)
-  | App
+  | App | App_return | App_exn
   | Return of tid | Retexn of tid (* the function exit *)
   | Lazyforce of tid
   | Ccall of Primitive.description * tid list

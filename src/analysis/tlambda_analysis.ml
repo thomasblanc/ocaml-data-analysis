@@ -476,6 +476,8 @@ end
         let f = get_env fun_tid env in
         let l = Funs.extract_ids f in
         [| Envs.bottom; Envs.bottom |], l
+      | [ id, App_return ] -> set_env id ( get_env ret_tid env) env
+      | [ id, App_exn ] -> set_env id ( get_env exn_tid env ) env
       | [ id, Ccall (pd, l) ] ->
         let open Primitive in
         assert ( pd.prim_arity = List.length l );

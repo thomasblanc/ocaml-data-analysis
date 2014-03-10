@@ -133,9 +133,12 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
 
     | Tapply ( f, x) ->
       let retv = nv g in
+      let appout = nv g and appexn = nv g in
       simpleh g id (  App_prep ( f, x ) ) ~inv ~outv:retv;
       add_hedge g ( Hedge.mk ()) [ id, App ]
-        ~pred:[|retv|] ~succ:[| outv; exnv |]
+        ~pred:[|retv|] ~succ:[| appout; appexn |];
+      simpleh g id ( App_return ) ~inv:appot ~outv;
+      simpleh g exn_id ( App_exn ) ~inv:appexn ~outv:exnv
 
     | Tprim ( p, args) ->
       simpleh g id ( Prim ( p, args ) ) ~inv ~outv
