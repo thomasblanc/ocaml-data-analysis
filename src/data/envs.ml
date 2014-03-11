@@ -75,7 +75,7 @@ let gc roots env =
         | Prim ( _, l )
         | Ccall ( _, l )->
           List.rev_append l res
-        | Return _ | Retexn _ -> failwith "TODO: GC function return"
+        | App_return | App_exn | Return _ | Retexn _ -> failwith "TODO: GC function return"
         | App -> assert false
       )
       es res
