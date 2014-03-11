@@ -137,7 +137,7 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
       simpleh g id (  App_prep ( f, x ) ) ~inv ~outv:retv;
       add_hedge g ( Hedge.mk ()) [ id, App ]
         ~pred:[|retv|] ~succ:[| appout; appexn |];
-      simpleh g id ( App_return ) ~inv:appot ~outv;
+      simpleh g id ( App_return ) ~inv:appout ~outv;
       simpleh g exn_id ( App_exn ) ~inv:appexn ~outv:exnv
 
     | Tprim ( p, args) ->

@@ -7,6 +7,10 @@ let print_hedge_attribute ppf hattr =
       Format.fprintf ppf "App_prep"
     | App ->
       Format.fprintf ppf "App"
+    | App_return ->
+      Format.fprintf ppf "App_return"
+    | App_exn ->
+      Format.fprintf ppf "App_exn"
     | Return _ ->
       Format.fprintf ppf "Return"
     | Retexn _ ->

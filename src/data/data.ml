@@ -122,6 +122,9 @@ let mem_env id = function
 let cp_env id env =
   reg_env (get_env id env ) env
 
+let rm_env id = function
+  | Bottom -> assert false
+  | Env m -> Env (Idm.remove id m)
 
 (* simple functions and values *)
 

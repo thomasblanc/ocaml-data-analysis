@@ -136,7 +136,7 @@ and constraint_env_tag expr tag env =
   | Lazyforce _
   | Ccall (_, _)
   | Send (_, _) -> env
-  | App -> assert false
+  | App | App_return | App_exn -> assert false
   | Prim ( p, l ) ->
     begin
       match p with
@@ -223,6 +223,8 @@ end
     let exn_tid = TId.create ()
     let arg_tid = TId.create ()
 
+    let constant_table = HedgeTbl.create 65536
+
     let rec constant env = function
       | Const_base c ->
         let open Asttypes in
@@ -261,8 +263,9 @@ end
     (* Data.singleton_string s *)
 
 
-    let apply (_ :hedge ) ( l : hedge_attribute ) ( envs : abstract array ) =
+    let apply (hedge_id :hedge ) ( l : hedge_attribute ) ( envs : abstract array ) =
       incr apply_counter;
+      let simpleout env = ( [| env |], [] ) in
       let in_apply ( id, action) env =
         let set x = set_env id x env
         and get x = get_env x env
@@ -276,10 +279,16 @@ end
           warn ~env msg
         in
         match action with
-        | App | App_prep _ | Lazyforce _ | Ccall _ | Send _ -> assert false
+        | App | App_prep _ | App_return | App_exn | Lazyforce _ | Ccall _ | Send _ -> assert false
         | Var i -> set ( act (get i) )
         | Const c ->
-          let env,d = constant env c in
+          let env,d =
+            try env, HedgeTbl.find constant_table hedge_id with
+            | Not_found ->
+              let env, d = constant env c in
+              HedgeTbl.add constant_table hedge_id d;
+              env, d
+          in
           set_env id ( act d ) env
         | Prim ( p, l ) ->
           begin
@@ -441,9 +450,12 @@ end
               let x = Funs.field i (get f) env in
               sa x
 
-            | TPgetfun fid, [] -> sa ( Funs.fid fid (get fun_tid ) )
+            | TPgetfun fid, [] ->
+              sa ( Funs.fid fid (get fun_tid ) )
+              |> rm_env fun_tid
             | TPfun fid, _ -> sa ( Funs.mk fid l )
             | TPgetarg, [] -> sa ( get arg_tid )
+              |> rm_env arg_tid
             (* Lastly, if everything fails, it means there's still work to get done !*)
             | _ -> dsaw "TODO: primitives !"
           end
@@ -476,8 +488,8 @@ end
         let f = get_env fun_tid env in
         let l = Funs.extract_ids f in
         [| Envs.bottom; Envs.bottom |], l
-      | [ id, App_return ] -> set_env id ( get_env ret_tid env) env
-      | [ id, App_exn ] -> set_env id ( get_env exn_tid env ) env
+      | [ id, App_return ] -> simpleout ( set_env id ( get_env ret_tid env) env )
+      | [ id, App_exn ] -> simpleout ( set_env id ( get_env exn_tid env ) env )
       | [ id, Ccall (pd, l) ] ->
         let open Primitive in
         assert ( pd.prim_arity = List.length l );
