@@ -101,6 +101,7 @@ begin test "tmain"
   "conditionnal" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "conditionnal.ml" "-dot" "conditionnal" ] )
   "cycle" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "cycle.ml" "-dot" "cycle" ] )
   "minicycle" ( test_args = [ "-counter" "minicycle.ml" "-dot" "minicycle" ] )
+  "loop_no_rec" ( test_args = [ "-counter" "loop_no_rec.ml" "-dot" "loop_no_rec" ] test_exit = 1 )
   "functions" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "functions.ml" "-dot" "functions" ] )
  ]
 
