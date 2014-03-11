@@ -2,12 +2,13 @@ open Hgraph_types
 open Fixpoint_types
 
 type ('a,'b) vertex_result_attribute =
-  { abstract : 'a;
+  { v_abstract : 'a;
     v_stack : 'b }
 
-type ('a,'b) hedge_result_attribute =
+type ('a,'b,'c) hedge_result_attribute =
   { orig : 'a;
-    h_stack : 'b }
+    h_abstract : 'b;
+    h_stack : 'c }
 
 module Fixpoint (T:T) (Manager:Manager with module T := T) : sig
 
@@ -20,7 +21,7 @@ module Fixpoint (T:T) (Manager:Manager with module T := T) : sig
     (* ?err_graph:(unit, Manager.hedge_attribute, unit) Manager.H.graph option ref -> *)
     input_graph -> Manager.H.VertexSet.t ->
     ((Manager.abstract, Manager.Stack.t) vertex_result_attribute,
-     (Manager.hedge_attribute, Manager.Stack.t) hedge_result_attribute,
+     (Manager.hedge_attribute, Manager.abstract array option, Manager.Stack.t) hedge_result_attribute,
      unit) Manager.H.graph *
     Manager.H.VertexSet.t Manager.H.VertexMap.t
 

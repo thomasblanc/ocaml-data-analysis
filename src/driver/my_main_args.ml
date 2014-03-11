@@ -14,6 +14,7 @@ let target_string : string option ref = ref None
 let count_apply = ref false
 
 let dot_file : string option ref = ref None
+let show_unreachable = ref false
 
 let dump_tlambda = ref false
 let dot_bigraphs = ref false
@@ -41,6 +42,9 @@ let arg_parser =
       ( "-dot",
         String (fun s -> dot_file := Some s ),
         " Dumps the result to a dot file");
+      ( "-show-unreachable",
+        Set show_unreachable,
+        " show unreachable nodes in the dot graph");
       ( "-dtlambda",
         Set dump_tlambda,
         " Dump the produced tlambda in a .tml file");

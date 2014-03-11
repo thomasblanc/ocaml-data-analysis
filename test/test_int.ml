@@ -288,7 +288,7 @@ module Manager_base = struct
 end
 
 let print_attrvertex ppf vertex attr =
-  A2.print () ppf attr.Fixpoint.abstract
+  A2.print () ppf attr.Fixpoint.v_abstract
 
 let print_attrhedge ppf hedge attr =
   Format.pp_print_string ppf attr.Fixpoint.orig

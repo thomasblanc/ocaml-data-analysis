@@ -348,6 +348,8 @@ module Make(T:T) : Hgraph
       ?(print_attrhedge=fun ppf h _ -> T.Hedge.print ppf h)
       ?(vertex_subgraph=fun _ _ -> None)
       ?(hedge_subgraph=fun _ _ -> None)
+      ?(show_vertex=fun _ _ -> true)
+      ?(show_hedge=fun _ _ -> true)
       ppf g
     =
     let subgraphs : (string option,VertexSet.t * HedgeSet.t) Hashtbl.t = Hashtbl.create 1 in
@@ -355,16 +357,22 @@ module Make(T:T) : Hgraph
       try Hashtbl.find subgraphs sg
       with Not_found -> VertexSet.empty, HedgeSet.empty in
     List.iter (fun v ->
-        let sg = vertex_subgraph v (vertex_attrib g v) in
-        let vset,hset = get_subgraph sg in
-        let vset = VertexSet.add v vset in
-        Hashtbl.replace subgraphs sg (vset,hset))
+        let attrib = vertex_attrib g v in
+        if show_vertex v attrib
+        then
+          let sg = vertex_subgraph v attrib in
+          let vset,hset = get_subgraph sg in
+          let vset = VertexSet.add v vset in
+          Hashtbl.replace subgraphs sg (vset,hset))
       (list_vertex g);
     List.iter (fun h ->
-        let sg = hedge_subgraph h (hedge_attrib g h) in
-        let vset,hset = get_subgraph sg in
-        let hset = HedgeSet.add h hset in
-        Hashtbl.replace subgraphs sg (vset,hset))
+        let attrib = hedge_attrib g h in
+        if show_hedge h attrib
+        then
+          let sg = hedge_subgraph h attrib in
+          let vset,hset = get_subgraph sg in
+          let hset = HedgeSet.add h hset in
+          Hashtbl.replace subgraphs sg (vset,hset))
       (list_hedge g);
     let open Format in
     fprintf ppf "digraph G {@.  @[<v>%s@ " style;
@@ -401,18 +409,25 @@ module Make(T:T) : Hgraph
       subgraphs;
     HTbl.iter
       (begin fun hedge hedge_n ->
-         Array.iter
-           (begin fun pred ->
-              fprintf ppf "\"%a\" -> \"%a\";@ "
-                print_vertex pred print_hedge hedge
-            end)
-           hedge_n.h_pred;
-         Array.iter
-           (begin fun succ ->
-              fprintf ppf "\"%a\" -> \"%a\";@ "
-                print_hedge hedge print_vertex succ
-            end)
-           hedge_n.h_succ
+         if show_hedge hedge hedge_n.h_attr
+         then begin
+           Array.iter
+             (begin fun pred ->
+                if show_vertex pred (vertex_attrib g pred)
+                then
+                  fprintf ppf "\"%a\" -> \"%a\";@ "
+                    print_vertex pred print_hedge hedge
+              end)
+             hedge_n.h_pred;
+           Array.iter
+             (begin fun succ ->
+                if show_vertex succ (vertex_attrib g succ)
+                then
+                  fprintf ppf "\"%a\" -> \"%a\";@ "
+                    print_hedge hedge print_vertex succ
+              end)
+             hedge_n.h_succ
+         end
        end)
       g.hedge
     ;

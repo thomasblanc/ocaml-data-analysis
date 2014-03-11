@@ -67,3 +67,19 @@ let hedge_subgraph _h attr =
       attr.Fixpoint.h_stack
   then None
   else Some (Format.asprintf "cluster_%a" Tlambda_analysis.Stack.print attr.Fixpoint.h_stack)
+
+let show_vertex _v attr =
+  not (Envs.is_bottom attr.Fixpoint.v_abstract)
+
+let show_hedge _h attr =
+  match attr.Fixpoint.h_abstract with
+  | None -> false
+  | Some arr -> true
+
+(* more correct, but less readable... app nodes helps give structure *)
+
+(* let show_hedge _h attr = *)
+(*   match attr.Fixpoint.h_abstract with *)
+(*   | None -> false *)
+(*   | Some arr -> *)
+(*     not (List.exists Envs.is_bottom (Array.to_list arr)) *)
