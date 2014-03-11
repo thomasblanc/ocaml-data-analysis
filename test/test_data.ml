@@ -307,7 +307,7 @@ let print_env ppf attr =
     fprintf ppf "@]}"
 
 let print_attrvertex ppf vertex attr =
-  Format.fprintf ppf "%s %a" vertex print_env attr
+  Format.fprintf ppf "%s %a" vertex print_env attr.Fixpoint.v_abstract
 
 let ouput_dot g =
   H.print_dot

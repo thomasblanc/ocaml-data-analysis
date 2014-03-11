@@ -22,7 +22,7 @@ let () =
       (Manager.H.VertexMap.find exnv assotiation_map) in
   let exn_env =
     Manager.join_list exnv
-      (List.map (Tlambda_to_hgraph.G.vertex_attrib result) exnv_output) in
+      (List.map (fun v -> (Tlambda_to_hgraph.G.vertex_attrib result v).Fixpoint.v_abstract) exnv_output) in
   if Envs.is_bottom exn_env
   then ()
   else

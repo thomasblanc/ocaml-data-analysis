@@ -314,6 +314,15 @@ module WorkQueue(S:Set.S) = struct
 
 end
 
+type ('a,'b) vertex_result_attribute =
+  { v_abstract : 'a;
+    v_stack : 'b }
+
+type ('a,'b,'c) hedge_result_attribute =
+  { orig : 'a;
+    h_abstract : 'b;
+    h_stack : 'c }
+
 module Fixpoint (T:T) (M:Manager with module T := T) = struct
   module SG = StackGraph(T) (M.H) (M.Stack)
 
@@ -478,11 +487,22 @@ module Fixpoint (T:T) (M:Manager with module T := T) = struct
           orig_vertex
           (M.H.VertexSet.add new_vertex set)
           !vertex_map;
-      try M.H.VertexMap.find new_vertex state.vertex_values
-      with Not_found -> M.bottom new_vertex
+      let v_abstract =
+        try M.H.VertexMap.find new_vertex state.vertex_values
+        with Not_found -> M.bottom new_vertex in
+      { v_abstract;
+        v_stack = attrib.SG.stack }
+    in
+    let map_hedge new_hedge (attrib:'a SG.hedge_attrib) =
+      let h_abstract =
+        try Some (Array.copy (M.H.HedgeMap.find new_hedge state.hedge_values))
+        with Not_found -> None in
+      { orig = attrib.SG.orig_attrib;
+        h_abstract;
+        h_stack  = attrib.SG.stack }
     in
     assert(M.H.correct state.graph.SG.graph);
-    let graph = M.H.copy state.graph.SG.graph map_vertex (fun _ a -> a.SG.orig_attrib) (fun _ -> ()) in
+    let graph = M.H.copy state.graph.SG.graph map_vertex map_hedge (fun _ -> ()) in
     assert(M.H.correct graph);
     graph, !vertex_map
 
