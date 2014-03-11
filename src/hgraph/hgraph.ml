@@ -344,42 +344,61 @@ module Make(T:T) : Hgraph
       ?fvertexstyle
       ?fhedgestyle
       ?(title:string="")
-      ?print_attrvertex
-      ?print_attrhedge
+      ?(print_attrvertex=fun ppf v _ -> T.Vertex.print ppf v)
+      ?(print_attrhedge=fun ppf h _ -> T.Hedge.print ppf h)
+      ?(vertex_subgraph=fun _ _ -> None)
+      ?(hedge_subgraph=fun _ _ -> None)
       ppf g
     =
+    let subgraphs : (string option,VertexSet.t * HedgeSet.t) Hashtbl.t = Hashtbl.create 1 in
+    let get_subgraph sg =
+      try Hashtbl.find subgraphs sg
+      with Not_found -> VertexSet.empty, HedgeSet.empty in
+    List.iter (fun v ->
+        let sg = vertex_subgraph v (vertex_attrib g v) in
+        let vset,hset = get_subgraph sg in
+        let vset = VertexSet.add v vset in
+        Hashtbl.replace subgraphs sg (vset,hset))
+      (list_vertex g);
+    List.iter (fun h ->
+        let sg = hedge_subgraph h (hedge_attrib g h) in
+        let vset,hset = get_subgraph sg in
+        let hset = HedgeSet.add h hset in
+        Hashtbl.replace subgraphs sg (vset,hset))
+      (list_hedge g);
     let open Format in
     fprintf ppf "digraph G {@.  @[<v>%s@ " style;
     if title<>"" then
       fprintf ppf "1073741823 [%s,label=\"%s\"];@ " titlestyle title;
-    begin match print_attrvertex with
-      | None -> ()
-      | Some print_attrvertex ->
-        VTbl.iter
-          (begin fun vertex vertex_n ->
+    Hashtbl.iter (fun sg (vertices,hedges) ->
+        (match sg with
+        | None -> ()
+        | Some sg -> fprintf ppf "subgraph \"%s\" {@[<2>@ " sg);
+        VertexSet.iter
+          (fun vertex ->
+             let attrib = vertex_attrib g vertex in
              fprintf ppf "%a [%s,label=\"%t\"];@ "
                print_vertex vertex
                (match fvertexstyle with
                 | Some f -> f vertex
                 | None -> vertexstyle)
-               (fun ppf -> print_attrvertex ppf vertex vertex_n.v_attr);
-           end)
-          g.vertex
-    end;
-    begin match print_attrhedge with
-      | None -> ()
-      | Some print_attrhedge ->
-        HTbl.iter
-          (begin fun hedge hedge_n ->
+               (fun ppf -> print_attrvertex ppf vertex attrib))
+          vertices;
+        HedgeSet.iter
+          (fun hedge ->
+             let attrib = hedge_attrib g hedge in
              fprintf ppf "%a [%s,label=\"%t\"];@ "
                print_hedge hedge
                (match fhedgestyle with
                 | Some f -> f hedge
                 | None -> hedgestyle)
-               (fun ppf -> print_attrhedge ppf hedge hedge_n.h_attr);
-           end)
-          g.hedge
-    end;
+               (fun ppf -> print_attrhedge ppf hedge attrib))
+          hedges;
+        (match sg with
+        | None -> ()
+        | Some _ -> fprintf ppf "@]}@ ");
+      )
+      subgraphs;
     HTbl.iter
       (begin fun hedge hedge_n ->
          Array.iter

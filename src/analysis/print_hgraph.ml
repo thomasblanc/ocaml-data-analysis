@@ -41,6 +41,29 @@ let print_attrhedge ppf h attr =
     Tlambda_to_hgraph.T.Hedge.print h
     print_hedge_attribute attr
 
-
-let print_attrvertex ppf v _ =
+let print_attrvertex ppf v attr =
   Tlambda_to_hgraph.T.Vertex.print ppf v
+
+let print_result_attrhedge ppf h attr =
+  Format.fprintf ppf "%a: %a"
+    Tlambda_to_hgraph.T.Hedge.print h
+    print_hedge_attribute attr.Fixpoint.orig
+
+let print_result_attrvertex ppf v attr =
+  Format.fprintf ppf "%a, %a"
+    Tlambda_to_hgraph.T.Vertex.print v
+    Tlambda_analysis.Stack.print attr.Fixpoint.v_stack
+
+let vertex_subgraph _v attr =
+  if Tlambda_analysis.Stack.equal
+      Tlambda_analysis.Stack.empty
+      attr.Fixpoint.v_stack
+  then None
+  else Some (Format.asprintf "cluster_%a" Tlambda_analysis.Stack.print attr.Fixpoint.v_stack)
+
+let hedge_subgraph _h attr =
+  if Tlambda_analysis.Stack.equal
+      Tlambda_analysis.Stack.empty
+      attr.Fixpoint.h_stack
+  then None
+  else Some (Format.asprintf "cluster_%a" Tlambda_analysis.Stack.print attr.Fixpoint.h_stack)

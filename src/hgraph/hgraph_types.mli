@@ -117,6 +117,8 @@ module type Hgraph = sig
     ?title:string ->
     ?print_attrvertex:(Format.formatter -> T.vertex -> 'a -> unit) ->
     ?print_attrhedge:(Format.formatter -> T.hedge -> 'b -> unit) ->
+    ?vertex_subgraph:(T.vertex -> 'a -> string option) ->
+    ?hedge_subgraph:(T.hedge -> 'b -> string option) ->
     Format.formatter -> ('a, 'b, 'c) graph -> unit
 
   val correct : ('a, 'b, 'c) graph -> bool

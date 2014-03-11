@@ -43,12 +43,12 @@ let () =
           (Manager.H.VertexMap.find outv assotiation_map) in
       let outv_env =
         Manager.join_list outv
-          (List.map (Tlambda_to_hgraph.G.vertex_attrib result) outv_output) in
+          (List.map (fun v -> (Tlambda_to_hgraph.G.vertex_attrib result v).Fixpoint.abstract) outv_output) in
       let exnv_output = Manager.H.VertexSet.elements
           (Manager.H.VertexMap.find exnv assotiation_map) in
       let exn_env =
         Manager.join_list exnv
-          (List.map (Tlambda_to_hgraph.G.vertex_attrib result) exnv_output) in
+          (List.map (fun v -> (Tlambda_to_hgraph.G.vertex_attrib result v).Fixpoint.abstract) exnv_output) in
       if !count_apply
       then Format.fprintf ppf "Pass count: %d@." (Tlambda_analysis.get_counter ());
       begin match !dot_file with
@@ -58,8 +58,10 @@ let () =
           let ppf = Format.formatter_of_out_channel oc in
           let open Print_hgraph in
           Manager.H.print_dot
-            ~print_attrvertex
-            ~print_attrhedge
+            ~print_attrvertex:print_result_attrvertex
+            ~print_attrhedge:print_result_attrhedge
+            ~vertex_subgraph
+            ~hedge_subgraph
             ppf result;
           close_out oc
       end;
