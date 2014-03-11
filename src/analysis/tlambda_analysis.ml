@@ -167,11 +167,16 @@ sig
   val mk_hedge : unit -> Hedge.t
 end
 
+module Stack = Abstract_stack.TwoLevels ( F )
+
 module M : functor ( E : Entry ) ->
 sig
   include Fixpoint_types.Manager
     with module T := T
-     and module H = G 
+     and module H = G
+     and type function_id = F.t
+     and module Function_id = F
+     and module Stack = Stack
      and type hedge_attribute = hattr
      and type vertex_attribute = vattr
      and type graph_attribute = gattr
@@ -213,7 +218,7 @@ end
         sg_hedge = f.f_hedge;
       }
 
-    module Stack = Abstract_stack.TwoLevels ( Function_id )
+    module Stack = Stack
 
     let clone_vertex _ = E.mk_vertex ()
     let clone_hedge _ = E.mk_hedge ()
@@ -465,7 +470,10 @@ end
             | Ccp cp  -> constraint_env_cp_var id cp env
             | Ctag tag -> constraint_env_tag_var id tag env
           end
-        | Return id -> set_env ret_tid ( get_env id env ) env
+        | Return id ->
+          Format.printf "ret %a@."
+            (fun ppf id -> Data.print ppf id env) id;
+          set_env ret_tid ( get_env id env ) env
         | Retexn id -> set_env exn_tid ( get_env id env ) env
       in
       assert ( Array.length envs = 1 );
@@ -483,10 +491,16 @@ end
           |> set_env fun_tid ( get_env f env )
           |> set_env arg_tid ( get_env x env )
         in
+        Format.printf "app_pre fun_tid %a@.arg_tid %a@."
+          (fun ppf id -> Data.print ppf id env) fun_tid
+          (fun ppf id -> Data.print ppf id env) arg_tid;
         ( [| env |], [] )
       | [ _, App ] ->
         let f = get_env fun_tid env in
         let l = Funs.extract_ids f in
+        Format.printf "apply %b@.%a@." (is_bottom f env)
+          (fun ppf () -> Data.print ppf fun_tid env) ();
+        List.iter (fun f -> Format.printf "outfunction %a@." Function_id.print f) l;
         [| Envs.bottom; Envs.bottom |], l
       | [ id, App_return ] -> simpleout ( set_env id ( get_env ret_tid env) env )
       | [ id, App_exn ] -> simpleout ( set_env id ( get_env exn_tid env ) env )

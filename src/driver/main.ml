@@ -39,11 +39,16 @@ let () =
       print_endline "starting the analysis";
       let result, assotiation_map =
         F.kleene_fixpoint g ( Manager.H.VertexSet.singleton inv ) in
+      let outv_output = Manager.H.VertexSet.elements
+          (Manager.H.VertexMap.find outv assotiation_map) in
+      let outv_env =
+        Manager.join_list outv
+          (List.map (fun v -> (Tlambda_to_hgraph.G.vertex_attrib result v).Fixpoint.v_abstract) outv_output) in
       let exnv_output = Manager.H.VertexSet.elements
           (Manager.H.VertexMap.find exnv assotiation_map) in
       let exn_env =
         Manager.join_list exnv
-          (List.map (Tlambda_to_hgraph.G.vertex_attrib result) exnv_output) in
+          (List.map (fun v -> (Tlambda_to_hgraph.G.vertex_attrib result v).Fixpoint.v_abstract) exnv_output) in
       if !count_apply
       then Format.fprintf ppf "Pass count: %d@." (Tlambda_analysis.get_counter ());
       begin match !dot_file with
@@ -52,11 +57,23 @@ let () =
           let oc = open_out (file ^ ".dot") in
           let ppf = Format.formatter_of_out_channel oc in
           let open Print_hgraph in
+          let show_hedge, show_vertex =
+            if !show_unreachable
+            then (fun _ _-> true), (fun _ _ -> true)
+            else show_hedge, show_vertex in
           Manager.H.print_dot
-            ~print_attrvertex
-            ~print_attrhedge
+            ~print_attrvertex:print_result_attrvertex
+            ~print_attrhedge:print_result_attrhedge
+            ~vertex_subgraph
+            ~hedge_subgraph
+            ~show_hedge
+            ~show_vertex
             ppf result;
           close_out oc
+      end;
+      if Envs.is_bottom outv_env
+      then begin
+        Format.fprintf ppf "Unreachable output@."
       end;
       if Envs.is_bottom exn_env
       then ()
