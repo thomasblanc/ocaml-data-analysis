@@ -494,7 +494,10 @@ end
             | TPgetarg, [] -> sa ( get arg_tid )
               |> rm_env arg_tid
             (* Lastly, if everything fails, it means there's still work to get done !*)
-            | _ -> dsaw "TODO: primitives !"
+            | prim, _ ->
+              let str = Format.asprintf "TODO: primitives %a !"
+                  Print_tlambda.primitive prim in
+              dsaw str
           end
         | Constraint c ->
           begin
