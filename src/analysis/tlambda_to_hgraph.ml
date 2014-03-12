@@ -197,8 +197,8 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
       and ine = nv g in
       simpleh g i ctrue ~inv ~outv:int;
       simpleh g i cfalse ~inv ~outv:ine;
-      tlambda ~g ~ret_id ~exn_id ~inv:int ~outv ~exnv t;
-      tlambda ~g ~ret_id ~exn_id ~inv:ine ~outv ~exnv e
+      tlambda ~g ~ret_id:id ~exn_id ~inv:int ~outv ~exnv t;
+      tlambda ~g ~ret_id:id ~exn_id ~inv:ine ~outv ~exnv e
 
     | Twhile ( lcond, lbody) ->
       let outc = nv g in
