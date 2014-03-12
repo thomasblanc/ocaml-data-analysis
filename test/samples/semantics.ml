@@ -28,7 +28,7 @@ let () =
   assert( 2 <= 2 );
   assert( not( 3 <= 2 ) );
   assert( 2 >= 2 );
-  (* assert( not( 2 >= 3 ) ); *)
+  assert( not( 2 >= 3 ) );
   ()
 
 let () =

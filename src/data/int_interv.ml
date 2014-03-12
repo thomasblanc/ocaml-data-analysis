@@ -157,7 +157,7 @@ let comp c x y =
       | Clt -> test_lt xl xg yl yg
       | Cgt -> test_lt yl yg xl yg
       | Cle -> test_le xl xg yl yg
-      | Cge -> test_le yl yg xl yg
+      | Cge -> test_le yl yg xl xg
     end
 
 let make_comp c x y : t * t =
