@@ -67,6 +67,7 @@ and constraint_env_cp_exprs es cp env =
     es Envs.bottom
 
 and constraint_env_cp expr cp env =
+  assert(cp >= 0);
   match expr with
   | Var x -> constraint_env_cp_var x cp env
   | Prim ( p, l ) ->
