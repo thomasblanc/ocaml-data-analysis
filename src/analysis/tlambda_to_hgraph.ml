@@ -147,7 +147,7 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
       let switch_handle is_cp (i,lam) =
         let inc = nv g in
         simpleh g si_id ( Constraint ( if is_cp then Ccp i else Ctag i)) ~inv ~outv:inc;
-        tlambda ~g ~outv ~ret_id ~inv:inc ~exnv ~exn_id lam
+        tlambda ~g ~outv ~ret_id:id ~inv:inc ~exnv ~exn_id lam
       in
       let () = List.iter ( switch_handle true) s.t_consts
       and () = List.iter ( switch_handle false) s.t_blocks
@@ -171,7 +171,7 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
           let inf = nv g in
           Is.iter (fun cp -> simpleh g si_id (Constraint (Ccp cp)) ~inv ~outv:inf) cps;
           Is.iter (fun tag -> simpleh g si_id (Constraint (Ctag tag)) ~inv ~outv:inf) bs;
-          tlambda ~g ~outv ~ret_id ~inv:inf ~exnv ~exn_id lam
+          tlambda ~g ~outv ~ret_id:id ~inv:inf ~exnv ~exn_id lam
       end
 
     | Tstaticraise ( i, args) ->
@@ -182,15 +182,15 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
     | Tstaticcatch ( ltry, ( i, args), lwith) ->
       let catchv = nv g in
       Hashtbl.add statics i (catchv,args);
-      tlambda ~g ~outv ~ret_id ~inv ~exnv ~exn_id ltry;
-      tlambda ~g ~outv ~ret_id ~inv:catchv ~exnv ~exn_id lwith
+      tlambda ~g ~outv ~ret_id:id ~inv ~exnv ~exn_id ltry;
+      tlambda ~g ~outv ~ret_id:id ~inv:catchv ~exnv ~exn_id lwith
 
     | Traise i -> simpleh g exn_id (Var i) ~inv ~outv:exnv
 
     | Ttrywith ( ltry, exni, lwith)  ->
       let exnv2 = nv g in
-      tlambda ~g ~outv ~ret_id ~exn_id ~inv ~exnv:exnv2 ltry;
-      tlambda ~g ~outv ~ret_id ~exn_id ~inv:exnv2 ~exnv lwith
+      tlambda ~g ~outv ~ret_id:id ~exn_id ~inv ~exnv:exnv2 ltry;
+      tlambda ~g ~outv ~ret_id:id ~exn_id ~inv:exnv2 ~exnv lwith
 
     | Tifthenelse ( i, t, e) ->
       let int = nv g
@@ -203,13 +203,16 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
     | Twhile ( lcond, lbody) ->
       let outc = nv g in
       let inb = nv g in
-      simpleh g ret_id cfalse ~inv:outc ~outv;
-      simpleh g ret_id ctrue ~inv:outc ~outv:inb;
-      tlambda ~g ~outv:outc ~ret_id ~exn_id ~inv ~exnv lcond;
-      tlambda ~g ~outv:inv ~ret_id ~exn_id ~inv:inb ~exnv lbody
+      let test_id = mk_tid "$test" in
+      let body_id = mk_tid "$body" in
+      simpleh g test_id cfalse ~inv:outc ~outv;
+      simpleh g test_id ctrue ~inv:outc ~outv:inb;
+      tlambda ~g ~outv:outc ~ret_id:test_id ~exn_id ~inv ~exnv lcond;
+      tlambda ~g ~outv:inv ~ret_id:body_id ~exn_id ~inv:inb ~exnv lbody
 
     | Tfor ( i, start, stop, dir, lbody) ->
       let test_id = mk_tid "$test" in
+      let body_id = mk_tid "$body" in
       let initv = nv g in
       let testv = nv g in
       let inb = nv g in
@@ -220,7 +223,7 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
       simpleh g test_id ctrue ~inv:testv ~outv:inb;
       simpleh g i ( Prim ( TPoffsetint o, [i])) ~inv:outb ~outv:initv;
       simpleh g test_id cfalse ~inv:testv ~outv;
-      tlambda ~g ~outv:outb ~ret_id ~exn_id ~inv:inb ~exnv lbody
+      tlambda ~g ~outv:outb ~ret_id:body_id ~exn_id ~inv:inb ~exnv lbody
 
     | Tlazyforce i ->
       add_hedge g (Hedge.mk ()) [ id, (Lazyforce i)]
