@@ -19,7 +19,11 @@ let builtin id =
   let s = id.Ident.stamp in
   s > 0 && s < 1000
 
-module F = MakeId(struct end)
+module F = struct
+  include MakeId(struct end)
+  let is_important _ = true
+  let n = 2
+end
 
 type id = Id.t
 

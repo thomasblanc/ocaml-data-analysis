@@ -167,7 +167,7 @@ sig
   val mk_hedge : unit -> Hedge.t
 end
 
-module Stack = Abstract_stack.TwoLevels ( F )
+module Stack = Abstract_stack.Leveled ( F )
 
 module M : functor ( E : Entry ) ->
 sig
