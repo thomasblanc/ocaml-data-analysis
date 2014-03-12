@@ -126,11 +126,28 @@ and tcontrol ppf = function
   | Twhile (cond, body) ->
     fprintf ppf "@[<2>while@ %a@ do@ %a@ done@]"
       tlambda cond tlambda body
-  | Tfor _ -> failwith "print Tfor"
+  | Tfor (i,start,stop,dir,body) ->
+    fprintf ppf "@[<2>for@ %a@ =@ %a@ %s@ %a do@ %a@ done@]"
+      TId.print i
+      TId.print start
+      (if dir = Asttypes.Upto then "to" else "downto" )
+      TId.print stop
+      tlambda body
   | Tlazyforce id ->
     fprintf ppf "lazyforce@ %a" TId.print id
-  | Tccall _ -> failwith "print Tccall"
-  | Tsend _ -> failwith "print Tsend"
+  | Tccall (p,l) ->
+    begin
+      match l with
+      | hd::tl ->
+        fprintf ppf "{%s}@ (%a%a)"
+          p.Primitive.prim_native_name
+          TId.print hd
+          (fun ppf -> List.iter (fprintf ppf ",@ %a" TId.print)) tl
+      | [] -> assert false
+    end
+  | Tsend (_,o,m) ->
+    fprintf ppf "%a#%a"
+      TId.print o TId.print m
 
 and primitive ppf p =
   let open Asttypes in

@@ -91,18 +91,18 @@ begin test "tmain"
  test_serialized = true
  tests =
  [
-  "simple" ( test_args = [ "-counter" "myper.ml" "-dot" "myper" ] )
-  "chain" ( test_args = [ "-counter" "myper.ml" "-open" "Myper" "a.ml" "-dot" "a" ] )
-  "pervasives" ( test_args = [ "-counter" "pervasives.ml" "-dot" "pervasives" ] )
-  "simplest" ( test_args = [ "-counter" "simpler.ml" "-dot" "simpler" ] )
-  "pervasives2" ( test_args = [ "-counter" "pervasives2.ml" "-dot" "pervasives2" ] )
-  "good" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "good.ml" "-dot" "good" ] )
-  "bad" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "bad.ml" "-dot" "bad" ] test_exit = 1 )
-  "conditionnal" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "conditionnal.ml" "-dot" "conditionnal" ] )
-  "cycle" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "cycle.ml" "-dot" "cycle" ] )
-  "minicycle" ( test_args = [ "-counter" "minicycle.ml" "-dot" "minicycle" ] )
-  "loop_no_rec" ( test_args = [ "-counter" "loop_no_rec.ml" "-dot" "loop_no_rec" ] test_exit = 1 )
-  "functions" ( test_args = [ "-counter" "pervasives.ml" "-open" "Pervasives" "functions.ml" "-dot" "functions" ] )
+  "simple" ( test_args = [ "-counter" "-dtlambda" "myper.ml" "-dot" "myper" ] )
+  "chain" ( test_args = [ "-counter" "-dtlambda" "myper.ml" "-open" "Myper" "a.ml" "-dot" "a" ] )
+  "pervasives" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-dot" "pervasives" ] )
+  "simplest" ( test_args = [ "-counter" "-dtlambda" "simpler.ml" "-dot" "simpler" ] )
+  "pervasives2" ( test_args = [ "-counter" "-dtlambda" "pervasives2.ml" "-dot" "pervasives2" ] )
+  "good" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "good.ml" "-dot" "good" ] )
+  "bad" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "bad.ml" "-dot" "bad" ] test_exit = 1 )
+  "conditionnal" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "conditionnal.ml" "-dot" "conditionnal" ] )
+  "cycle" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "cycle.ml" "-dot" "cycle" ] )
+  "minicycle" ( test_args = [ "-counter" "-dtlambda" "minicycle.ml" "-dot" "minicycle" ] )
+  "loop_no_rec" ( test_args = [ "-counter" "-dtlambda" "loop_no_rec.ml" "-dot" "loop_no_rec" ] test_exit = 1 )
+  "functions" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "functions.ml" "-dot" "functions" ] )
  ]
 
 end
