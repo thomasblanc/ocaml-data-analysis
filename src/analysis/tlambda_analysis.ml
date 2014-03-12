@@ -485,8 +485,11 @@ end
               sa x
 
             | TPgetfun fid, [] ->
-              sa ( Funs.fid fid (get fun_tid ) )
-              |> rm_env fun_tid
+              let value = get fun_tid in
+              if Funs.has_fid fid value
+              then sa ( Funs.fid fid (get fun_tid ) )
+                   |> rm_env fun_tid
+              else Envs.bottom
             | TPfun fid, _ -> sa ( Funs.mk fid l )
             | TPgetarg, [] -> sa ( get arg_tid )
               |> rm_env arg_tid
