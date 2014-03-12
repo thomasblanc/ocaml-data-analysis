@@ -71,7 +71,14 @@ let handle_file ppf sourcefile =
     let tlambda = Mk_tlambda.lambda_to_tlambda ~modname:modulename ~funs lambda in
 
     if !dump_tlambda
-    then (Format.fprintf ppf "%a@." Print_tlambda.tlambda tlambda);
+    then begin
+      Format.fprintf ppf "%a@." Print_tlambda.tlambda tlambda;
+      Hashtbl.iter (fun f tlambda ->
+          Format.fprintf ppf "@[<2>function %a@ %a@]@."
+            F.print f
+            Print_tlambda.tlambda tlambda)
+        funs;
+    end;
 
     let (g,funtbl,vin,vout,vexn,exn_id,return_id) =
       Tlambda_to_hgraph.mk_graph ~modulename funs tlambda in
