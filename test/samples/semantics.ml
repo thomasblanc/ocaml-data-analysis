@@ -114,3 +114,32 @@ let () =
   (* decr r; *)
   (* assert( !r = 1 ); *)
   ()
+
+
+let () =
+  let x = if true then 1 else 2 in
+  assert( x = 1 );
+  let x = if false then 1 else 2 in
+  assert( x = 2 );
+  let x = if true then 1 else assert false in
+  assert( x = 1 );
+  let x = if false then assert false else 2 in
+  assert( x = 2 );
+
+  for i = 1 to 10 do
+    if i = 5 then assert(i = 5);
+    (* if i = 5 then assert(i <> 5); *) (* cannot be represented by interval *)
+    if i > 5 then assert(i > 5);
+    (* if i < 5 then assert(i < 5); *)
+  done;
+
+  ()
+
+let () =
+  let f x y = x + y in
+  let g f x = f x in
+  assert( f 1 2 = 3 );
+  assert( not (f 1 2 = 4) );
+  assert( g f 1 2 = 3 );
+  assert( not (g f 1 2 = 4) );
+  ()
