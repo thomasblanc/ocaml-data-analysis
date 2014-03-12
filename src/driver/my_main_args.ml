@@ -72,21 +72,29 @@ let handle_file ppf sourcefile =
 
     if !dump_tlambda
     then begin
+      let o = open_out ( outputprefix ^ ".tml" ) in
+      let ppf = Format.formatter_of_out_channel o in
       Format.fprintf ppf "%a@." Print_tlambda.tlambda tlambda;
       Hashtbl.iter (fun f tlambda ->
           Format.fprintf ppf "@[<2>function %a@ %a@]@."
             F.print f
             Print_tlambda.tlambda tlambda)
         funs;
+      close_out o
     end;
 
     let (g,funtbl,vin,vout,vexn,exn_id,return_id) =
       Tlambda_to_hgraph.mk_graph ~modulename funs tlambda in
 
     if !dot_bigraphs
-    then Print_hgraph . (
-        Tlambda_to_hgraph.G.print_dot
-          ~print_attrvertex ~print_attrhedge ppf g);
+    then begin
+      let o = open_out ( outputprefix ^ ".dot" ) in
+      let ppf = Format.formatter_of_out_channel o in
+      let open Print_hgraph in
+      Tlambda_to_hgraph.G.print_dot
+        ~print_attrvertex ~print_attrhedge ppf g;
+      close_out o
+    end;
 
     Cmb.export g funtbl vin vout vexn outputprefix;
     add_target (cmbise outputprefix)
