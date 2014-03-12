@@ -174,7 +174,7 @@ struct
       | (Important, v) :: t ->
         T.print ppf v;
         if depth > 1
-        then Format.fprintf ppf "@ ::@ ";
+        then Format.fprintf ppf " :: ";
         aux (depth-1) t
     in
     aux depth stack
