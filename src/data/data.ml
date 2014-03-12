@@ -2,8 +2,6 @@
 open Utils
 open Common_types
 
-(* use generative applications to have a new type each time *)
-
 type id = tid
 
 type constant = Constants.t
@@ -19,10 +17,10 @@ module Intm = Map.Make (struct type t = int let compare = compare let print = Fo
 
 module Tagm = Map.Make (struct type t = tag let compare = compare let print = Format.pp_print_int end)
 
-module Idm = Map.Make (struct type t = tid let compare = compare let print = TId.print end)
-module Ids = Set.Make (struct type t = tid let compare = compare let print = TId.print end)
+module Idm = Map.Make (TId)
+module Ids = Set.Make (TId)
 
-module Fm = Map.Make (struct type t = f let compare = compare let print = F.print end)
+module Fm = Map.Make (F)
 
 module Hinfos = Set.Make (struct type t = hinfo let compare = compare let print _ _ = () end)
 
