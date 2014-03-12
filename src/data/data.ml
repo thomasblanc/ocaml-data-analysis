@@ -82,6 +82,8 @@ let bottom =
 
 let top = { bottom with top = true; }
 
+let is_top { top; _ } = top
+
 (* Bottom test *)
 
 let is_bottom_simple = function

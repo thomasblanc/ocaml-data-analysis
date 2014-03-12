@@ -59,6 +59,12 @@ let rec constraint_env_cp_var id cp env =
         constraint_env_cp_exprs es cp env
         |> set_env id (Cps.restrict ~v:cp d)
       end
+  else if Data.is_top d
+  then
+    begin
+      constraint_env_cp_exprs es cp env
+      |> set_env id (Cps.restrict ~v:cp d)
+    end
   else Envs.bottom
 
 and constraint_env_cp_exprs es cp env =
