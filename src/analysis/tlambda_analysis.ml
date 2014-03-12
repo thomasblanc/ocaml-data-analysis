@@ -355,7 +355,7 @@ end
             | TPduprecord (trepr,i), [r] -> dsaw "TODO: duprecord"
 
             (* Boolean not *)
-            | TPnot, [i] -> set ( Bools.notb ( get i))
+            | TPnot, [i] -> sa ( Bools.notb ( get i))
 
             (* Integer operations *)
             | TPnegint, [i] -> sa ( Int.op1 Int_interv.uminus ( get i))
