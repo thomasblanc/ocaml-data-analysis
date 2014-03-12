@@ -106,7 +106,7 @@ let set_env id data = function
   | Env env -> Env (Idm.add id data env)
 
 let get_env id = function
-  | Bottom -> bottom
+  | Bottom -> assert false
   | Env env ->
     try Idm.find id env
     with Not_found -> bottom
