@@ -230,6 +230,34 @@ end
 
     let constant_table = HedgeTbl.create 65536
 
+    let builtin_match_failure = Strings.singleton "Match_failure"
+    let builtin_assert_failure = Strings.singleton "Assert_failure"
+    let builtin_failure = Strings.singleton "Failure"
+    let builtin_not_found = Strings.singleton "Not_found"
+    let builtin_out_of_memory = Strings.singleton "Out_of_memory"
+    let builtin_stack_overflow = Strings.singleton "Stack_overflow"
+    let builtin_sys_error = Strings.singleton "Sys_error"
+    let builtin_end_of_file = Strings.singleton "End_of_file"
+    let builtin_division_by_zero = Strings.singleton "Division_by_zero"
+    let builtin_sys_blocked_io = Strings.singleton "Sys_blocked_io"
+    let builtin_undefined_recursive_module = Strings.singleton "Undefined_recursive_module"
+
+    let builtin_of_id i =
+      match TId.stamp i with
+      | 16 -> builtin_match_failure
+      | 17 -> builtin_assert_failure
+      | 18 -> builtin_failure
+      | 19 -> builtin_not_found
+      | 20 -> builtin_out_of_memory
+      | 21 -> builtin_stack_overflow
+      | 22 -> builtin_sys_error
+      | 23 -> builtin_end_of_file
+      | 24 -> builtin_division_by_zero
+      | 25 -> builtin_sys_blocked_io
+      | 26 -> builtin_undefined_recursive_module
+      | _ -> assert false
+
+
     let rec constant env = function
       | Const_base c ->
         let open Asttypes in
@@ -298,6 +326,7 @@ end
         | Prim ( p, l ) ->
           begin
             match p, l with
+            | TPbuiltin, [i] -> sa ( builtin_of_id i )
             (* Operations on heap blocks *)
             | TPmakeblock ( tag, _), _ ->
               let a = Array.of_list l in

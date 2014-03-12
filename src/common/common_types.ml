@@ -38,6 +38,7 @@ struct
   let output o (m,x) = Printf.fprintf o "%s.%s/%d" m x.name x.stamp
   let print pp (m,x) = Format.fprintf pp "%s.%s/%d" m x.name x.stamp
   let idref = ref 0
+  let stamp (_,x) = x.stamp
   let create ?(name="") () =
     decr idref;
     ( "", { stamp = !idref; name = ( "$$" ^ name ); flags = 0; } )
