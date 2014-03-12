@@ -13,4 +13,4 @@ let _ =
         y / 2 > 0
       with _ -> raise E )
   then raise X
-  else raise N
+  else ()
