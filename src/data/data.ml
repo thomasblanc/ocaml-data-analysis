@@ -100,7 +100,8 @@ let set_env id data = function
   | Bottom ->
     (* not sure this should really forbidden, but this may help avoid
        some bugs *)
-    failwith "bottom should never be assigned"
+    let str = Format.asprintf "bottom should never be assigned: %a" TId.print id in
+    failwith str
   | Env env -> Env (Idm.add id data env)
 
 let get_env id = function
