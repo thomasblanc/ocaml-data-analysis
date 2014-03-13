@@ -113,9 +113,10 @@ let prim_translate = function
 
 
 let var_name_of_lambda = function
-  | Lvar _ | Llet _ | Lletrec _ 
-  | Lassign _ | Lifused _ | Levent _
-  | Lsequence _ -> assert false
+  | Lvar v -> ( match Id.name v with Some n -> n | None -> "_var_" )
+  | Llet _ | Lletrec _ -> "_var_"
+  | Lassign _ | Lifused _ | Levent _ -> assert false
+  | Lsequence _ -> "_seq_"
   | Lconst _ -> "_const_"
   | Lapply _ -> "_app_"
   | Lfunction _ -> "_funct_"
@@ -594,7 +595,7 @@ let lambda_to_tlambda ~modname ~funs code =
            match lam with
            | Lvar v -> (b,v::l)
            | _ ->
-             let i = mk () in
+             let i = mk ~name:(var_name_of_lambda lam) () in
              (false,i::l)
         ) (true,[]) l
     in
@@ -604,7 +605,7 @@ let lambda_to_tlambda ~modname ~funs code =
     | [] -> res, List.rev l
     | ( Lvar _ as lam ) :: tl -> extract_lams res (lam::l) tl
     | lam :: tl ->
-      let i = mk () in
+      let i = mk ~name:(var_name_of_lambda lam) () in
       extract_lams ((i,lam)::res) ((Lvar i)::l) tl
 
   and extract_and_apply rv nfv fv stack mkl mkt l =
