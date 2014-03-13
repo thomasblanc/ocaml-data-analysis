@@ -140,7 +140,7 @@ and tcontrol ppf = function
       match l with
       | hd::tl ->
         fprintf ppf "{%s}@ (%a%a)"
-          p.Primitive.prim_native_name
+          p.Primitive.prim_name
           TId.print_simple hd
           (fun ppf -> List.iter (fprintf ppf ",@ %a" TId.print_simple)) tl
       | [] -> assert false
