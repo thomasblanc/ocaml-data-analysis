@@ -49,7 +49,7 @@ let print_bigarray name unsafe kind ppf layout =
      | Pbigarray_c_layout -> "C"
      | Pbigarray_fortran_layout -> "Fortran")
 
-let id_list ppf ids = List.iter (fun l -> fprintf ppf "@ %a" TId.print l) ids
+let id_list ppf ids = List.iter (fun l -> fprintf ppf "@ %a" TId.print_simple l) ids
 
 let rec tlambda ppf = function
   | Tlet t -> tlet ppf t
@@ -63,7 +63,7 @@ and tlet ppf tl =
     | Tend tid -> tend ppf tid
   and one ppf { te_id; te_lam; te_kind; te_in } =
     fprintf ppf "@[@[<2>let %a@ =@ @[<2>%a@]@] in@ %a@]"
-      TId.print te_id
+      TId.print_simple te_id
       tcontrol te_lam
       aux te_in
   in
@@ -73,20 +73,20 @@ and trec ppf { tr_decls; tr_in } =
   fprintf ppf "@[@[<2>letrec@ ";
   List.iter (fun ( i, p, args) ->
       fprintf ppf "@[%a@ =@ %a@ %a@]"
-        TId.print i
+        TId.print_simple i
         primitive p
         id_list args
     ) tr_decls;
   fprintf ppf "@] in@ %a@]"
     tlambda tr_in
 
-and tend ppf tid = fprintf ppf "%a" TId.print tid
+and tend ppf tid = fprintf ppf "%a" TId.print_simple tid
 
 and tcontrol ppf = function
-  | Tvar id -> TId.print ppf id
+  | Tvar id -> TId.print_simple ppf id
   | Tconst c -> Printlambda.structured_constant ppf c
   | Tapply (f, arg) ->
-    fprintf ppf "apply@ %a@ %a" TId.print f TId.print arg
+    fprintf ppf "apply@ %a@ %a" TId.print_simple f TId.print_simple arg
   | Tprim (p,args) ->
     fprintf ppf "%a%a" primitive p id_list args
   | Tswitch (case, sw) ->
@@ -109,45 +109,45 @@ and tcontrol ppf = function
           fprintf ppf "@[<hv 1>_ ->@ %a@]" tlambda l
       end in
     fprintf ppf
-      "@[<1>switch %a with@ %a@]" TId.print case switch sw
+      "@[<1>switch %a with@ %a@]" TId.print_simple case switch sw
   | Tstaticraise (i, ids) ->
     fprintf ppf "staticraise %i %a" i id_list ids
   | Tstaticcatch (body, (n, ids), handler) ->
     fprintf ppf "@[<2>catch@ %a@ with@ %i@ (%a)@ -> %a@]"
       tlambda body n id_list ids tlambda handler
   | Traise id ->
-    fprintf ppf "raise@ %a" TId.print id
+    fprintf ppf "raise@ %a" TId.print_simple id
   | Ttrywith (body, id, handler) ->
     fprintf ppf "@[<2>try@ %a@ with@ %a@ -> %a@]"
-      tlambda body TId.print id tlambda handler
+      tlambda body TId.print_simple id tlambda handler
   | Tifthenelse (cond, ifso, ifnot) ->
     fprintf ppf "@[<2>if@ %a@ then@ %a@ else@ %a@]"
-      TId.print cond tlambda ifso tlambda ifnot
+      TId.print_simple cond tlambda ifso tlambda ifnot
   | Twhile (cond, body) ->
     fprintf ppf "@[<2>while@ %a@ do@ %a@ done@]"
       tlambda cond tlambda body
   | Tfor (i,start,stop,dir,body) ->
     fprintf ppf "@[<2>for@ %a@ =@ %a@ %s@ %a do@ %a@ done@]"
-      TId.print i
-      TId.print start
+      TId.print_simple i
+      TId.print_simple start
       (if dir = Asttypes.Upto then "to" else "downto" )
-      TId.print stop
+      TId.print_simple stop
       tlambda body
   | Tlazyforce id ->
-    fprintf ppf "lazyforce@ %a" TId.print id
+    fprintf ppf "lazyforce@ %a" TId.print_simple id
   | Tccall (p,l) ->
     begin
       match l with
       | hd::tl ->
         fprintf ppf "{%s}@ (%a%a)"
           p.Primitive.prim_native_name
-          TId.print hd
-          (fun ppf -> List.iter (fprintf ppf ",@ %a" TId.print)) tl
+          TId.print_simple hd
+          (fun ppf -> List.iter (fprintf ppf ",@ %a" TId.print_simple)) tl
       | [] -> assert false
     end
   | Tsend (_,o,m) ->
     fprintf ppf "%a#%a"
-      TId.print o TId.print m
+      TId.print_simple o TId.print_simple m
 
 and primitive ppf p =
   let open Asttypes in

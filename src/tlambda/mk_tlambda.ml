@@ -111,6 +111,23 @@ let prim_translate = function
   | Pbbswap k -> TPbbswap k
   | _ -> assert false
 
+
+let var_name_of_lambda = function
+  | Lvar _ | Llet _ | Lletrec _ 
+  | Lassign _ | Lifused _ | Levent _
+  | Lsequence _ -> assert false
+  | Lconst _ -> "_const_"
+  | Lapply _ -> "_app_"
+  | Lfunction _ -> "_funct_"
+  | Lprim _ -> "_primitive_"
+  | Lswitch _ -> "_match_"
+  | Lstaticcatch _ -> "_scatch_"
+  | Ltrywith _ -> "_trywith_"
+  | Lifthenelse _ -> "_if_"
+  | Lsend _ -> "_send_"
+  | Lstaticraise _ | Lwhile _ | Lfor _ -> "()"
+  
+
 let cp i = Lconst ( Const_pointer i )
 
 let lvars = List.map (fun v -> Lvar v)
@@ -134,7 +151,7 @@ let get_global i =
 
 let lambda_to_tlambda ~modname ~funs code =
 
-  let mk ?(name="") () = Id.create ~name () in
+  let mk ?(name="$$") () = Id.create ~name () in
 
   let tid i : tid = modname,i in
 
@@ -146,7 +163,7 @@ let lambda_to_tlambda ~modname ~funs code =
 
   let register_function tlam arg fv =
     let i = F.create ~name:modname ()  in
-    let idf = tid ( mk ()) in
+    let idf = tid ( mk ~name:"func_fv" ()) in
     let targ = tid arg in
     let tlam, _ =
       Idm.fold (fun _ id (tlam,n) ->
@@ -206,13 +223,13 @@ let lambda_to_tlambda ~modname ~funs code =
     | Lfor _
     | Lsend _
       as lam ->
-      let id = mk () in
+      let id = mk ~name:(var_name_of_lambda lam) () in
       tcontrol rv (Ids.add id nfv) fv [id, Lvar id] lam
     | Llet ( k, id , e, cont ) ->
       tcontrol rv (Ids.add id nfv) fv [id, cont] e
     | Lletrec (l, continuation) -> trec_main rv nfv fv [] l continuation
     | Lsequence ( a, b ) ->
-      let id = mk () in
+      let id = mk ~name:"()" () in
       tcontrol rv (Ids.add id nfv) fv [id, b] a
     | Lassign _
     | Levent _
@@ -263,12 +280,12 @@ let lambda_to_tlambda ~modname ~funs code =
       let fv, x = check rv nfv fv x in
       mk_tlet rv nfv fv stack ( Tapply ( tid f, tid x ) )
     | Lapply ( Lvar _ as f, [x], loc ) ->
-      let ix = mk () in
+      let ix = mk ~name:"_arg_" () in
       tcontrol rv (Ids.add ix nfv) fv
         ( (ix, Lapply ( f, [Lvar ix], loc ))::stack)
         x
     | Lapply ( f, ( _::[] as arg), loc ) ->
-      let idf = mk () in
+      let idf = mk ~name:"_fun_" () in
       tcontrol rv (Ids.add idf nfv) fv
         ( (idf, Lapply ( Lvar idf, arg, loc ) )::stack)
         f
@@ -319,7 +336,7 @@ let lambda_to_tlambda ~modname ~funs code =
             )
         )                                
     | Lswitch ( lam, s ) ->
-      let i = mk () in
+      let i = mk ~name:"_tomatch_" () in
       tcontrol rv nfv fv ( (i, Lswitch ( Lvar i, s))::stack ) lam
     | Lstaticraise (i, l) ->
       extract_and_apply rv nfv fv stack
@@ -348,13 +365,13 @@ let lambda_to_tlambda ~modname ~funs code =
       let fv, e = tlambda rv nfv fv e in
       mk_tlet rv nfv fv stack ( Tifthenelse ( tid v, t, e) )
     | Lifthenelse ( c, t, e ) ->
-      let i = mk () in
+      let i = mk ~name:"_ifcond_"() in
       tcontrol rv (Ids.add i nfv) fv
         (( i, Lifthenelse ( Lvar i, t, e ) )
          ::stack )
         c
     | Lsequence ( a, b ) ->
-      let i = mk () in
+      let i = mk ~name:"()" () in
       tcontrol rv (Ids.add i nfv) fv ((i,b)::stack) a
     | Lwhile ( c, b ) ->
       let fv, c = tlambda rv nfv fv c in
@@ -368,8 +385,8 @@ let lambda_to_tlambda ~modname ~funs code =
       mk_tlet rv nfv fv stack
         ( Tfor ( tid i, tid s, tid e, d, b ) )
     | Lfor ( i, s, e, d, b ) ->
-      let is = mk () in
-      let ie = mk () in
+      let is = mk ~name:"_start_" () in
+      let ie = mk ~name:"_stop_" () in
       tcontrol rv nfv fv
         ((is,e)
          ::(ie, Lfor ( i, Lvar is, Lvar ie, d, b ) )
@@ -381,20 +398,20 @@ let lambda_to_tlambda ~modname ~funs code =
       mk_tlet rv nfv fv stack
         ( Tsend ( k, tid o, tid m ) )
     | Lsend ( k, ( Lvar _ as o ), m, [], loc ) ->
-      let im = mk () in
+      let im = mk ~name:"_meth_" () in
       tcontrol rv nfv fv
         ( (im, Lsend ( k, o, Lvar im, [], loc))
           ::stack )
         m
     | Lsend ( k, o, (Lvar _ as m), [], loc ) ->
-      let io = mk () in
+      let io = mk ~name:"_obj_" () in
       tcontrol rv nfv fv
         ( (io, Lsend ( k, Lvar io, m, [], loc))
           ::stack )
         o
     | Lsend ( k, o,  m, [], loc ) ->
-      let im = mk () in
-      let io = mk () in
+      let im = mk ~name:"_meth_" () in
+      let io = mk ~name:"_obj_" () in
       tcontrol rv nfv fv
         ( (io, m)
           ::( im, Lsend ( k, Lvar io, Lvar im, [], loc ) )

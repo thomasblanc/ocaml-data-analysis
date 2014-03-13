@@ -10,9 +10,9 @@ struct
   let output o x = Printf.fprintf o "%s/%d" x.name x.stamp
   let print = print
   let idref = ref 0
-  let create ?(name="") () =
+  let create ?(name="$$") () =
     decr idref;
-    { stamp = !idref; name = ( "$$" ^ name ); flags = 0; }
+    { stamp = !idref; name = ( name ); flags = 0; }
 end
 
 let builtin id =
@@ -41,6 +41,7 @@ struct
   let to_string (m,x) = Printf.sprintf "%s.%s/%d" m x.name x.stamp
   let output o (m,x) = Printf.fprintf o "%s.%s/%d" m x.name x.stamp
   let print pp (m,x) = Format.fprintf pp "%s.%s/%d" m x.name x.stamp
+  let print_simple pp (_,x) = Id.print pp x
   let idref = ref 0
   let stamp (_,x) = x.stamp
   let create ?(name="") () =
