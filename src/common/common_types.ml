@@ -8,7 +8,10 @@ struct
   let name x = Some x.name
   let to_string x = Printf.sprintf "%s/%d" x.name x.stamp
   let output o x = Printf.fprintf o "%s/%d" x.name x.stamp
-  let print = print
+  let print pp x =
+    if x.name = "()"
+    then Format.fprintf pp "()"
+    else print pp x
   let idref = ref 0
   let create ?(name="$$") () =
     decr idref;
