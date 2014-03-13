@@ -103,6 +103,7 @@ begin test "tmain"
   "minicycle" ( test_args = [ "-counter" "-dtlambda" "minicycle.ml" "-dot" "minicycle" ] )
   "loop_no_rec" ( test_args = [ "-counter" "-dtlambda" "loop_no_rec.ml" "-dot" "loop_no_rec" ] test_exit = 1 )
   "functions" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "functions.ml" "-dot" "functions" ] )
+  "semantics" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "semantics.ml" "-dot" "semantics" ] )
  ]
 
 end

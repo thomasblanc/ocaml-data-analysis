@@ -11,7 +11,10 @@ let field i f env =
           ids data
       ) bottom  l
 
+let has_fid i fu = Fm.mem i fu.f
+
 let fid i fu =
+  assert(Fm.mem i fu.f);
   { bottom with f = Fm.singleton i ( Fm.find i fu.f ); }
 
 let mk i l =

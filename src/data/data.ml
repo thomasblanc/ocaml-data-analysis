@@ -2,8 +2,6 @@
 open Utils
 open Common_types
 
-(* use generative applications to have a new type each time *)
-
 type id = tid
 
 type constant = Constants.t
@@ -19,10 +17,10 @@ module Intm = Map.Make (struct type t = int let compare = compare let print = Fo
 
 module Tagm = Map.Make (struct type t = tag let compare = compare let print = Format.pp_print_int end)
 
-module Idm = Map.Make (struct type t = tid let compare = compare let print = TId.print end)
-module Ids = Set.Make (struct type t = tid let compare = compare let print = TId.print end)
+module Idm = Map.Make (TId)
+module Ids = Set.Make (TId)
 
-module Fm = Map.Make (struct type t = f let compare = compare let print = F.print end)
+module Fm = Map.Make (F)
 
 module Hinfos = Set.Make (struct type t = hinfo let compare = compare let print _ _ = () end)
 
@@ -104,7 +102,8 @@ let set_env id data = function
   | Bottom ->
     (* not sure this should really forbidden, but this may help avoid
        some bugs *)
-    failwith "bottom should never be assigned"
+    let str = Format.asprintf "bottom should never be assigned: %a" TId.print id in
+    failwith str
   | Env env -> Env (Idm.add id data env)
 
 let get_env id = function

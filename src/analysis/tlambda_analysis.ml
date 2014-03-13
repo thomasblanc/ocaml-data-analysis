@@ -73,6 +73,7 @@ and constraint_env_cp_exprs es cp env =
     es Envs.bottom
 
 and constraint_env_cp expr cp env =
+  assert(cp >= 0);
   match expr with
   | Var x -> constraint_env_cp_var x cp env
   | Prim ( p, l ) ->
@@ -173,7 +174,7 @@ sig
   val mk_hedge : unit -> Hedge.t
 end
 
-module Stack = Abstract_stack.TwoLevels ( F )
+module Stack = Abstract_stack.Leveled ( F )
 
 module M : functor ( E : Entry ) ->
 sig
@@ -360,7 +361,7 @@ end
             | TPduprecord (trepr,i), [r] -> dsaw "TODO: duprecord"
 
             (* Boolean not *)
-            | TPnot, [i] -> set ( Bools.notb ( get i))
+            | TPnot, [i] -> sa ( Bools.notb ( get i))
 
             (* Integer operations *)
             | TPnegint, [i] -> sa ( Int.op1 Int_interv.uminus ( get i))
@@ -491,13 +492,19 @@ end
               sa x
 
             | TPgetfun fid, [] ->
-              sa ( Funs.fid fid (get fun_tid ) )
-              |> rm_env fun_tid
+              let value = get fun_tid in
+              if Funs.has_fid fid value
+              then sa ( Funs.fid fid (get fun_tid ) )
+                   |> rm_env fun_tid
+              else Envs.bottom
             | TPfun fid, _ -> sa ( Funs.mk fid l )
             | TPgetarg, [] -> sa ( get arg_tid )
               |> rm_env arg_tid
             (* Lastly, if everything fails, it means there's still work to get done !*)
-            | _ -> dsaw "TODO: primitives !"
+            | prim, _ ->
+              let str = Format.asprintf "TODO: primitives %a !"
+                  Print_tlambda.primitive prim in
+              dsaw str
           end
         | Constraint c ->
           begin
