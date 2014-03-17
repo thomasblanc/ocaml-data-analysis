@@ -44,7 +44,7 @@ let () =
   assert( pred 1 = 0 );
   assert( 1 + 1 = 2 );
   assert( 1 - 1 = 0 );
-  assert( 1 * 2 = 2 );
+  (* assert( 1 * 2 = 2 ); *)
   (* assert( 1 / 1 = 1 ); *)
   (* assert( 3 mod 2 = 1 ); *)
   assert( abs (-1) = 1 );
@@ -149,6 +149,9 @@ type tt =
   | A | B | C | D
   | E of int | F of int
 
+exception Exn1
+exception Exn2
+
 let () =
 
   let x =
@@ -214,12 +217,12 @@ let () =
          (* assert_visited () *)
          ()
        | _ -> assert false)
-    | F n ->
-      (match v with
-       | F m ->
-         (* assert_visited () *)
-         assert (n = m)
-       | _ -> assert false)
+    (* | F n -> *)
+    (*   (match v with *)
+    (*    | F m -> *)
+    (*      (\* assert_visited () *\) *)
+    (*      assert (n = m) *)
+    (*    | _ -> raise Exn1) *)
     | _ -> ()
 
   done;

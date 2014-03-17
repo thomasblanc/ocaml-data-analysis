@@ -13,6 +13,10 @@ val join_list : t list -> t
 val widening : t -> t -> t
 val print : Format.formatter -> t -> unit
 
+val mem : int -> t -> bool
+val cardinal : t -> int option
+val unique : t -> bool
+
 val meet : t -> t -> t
 val cst : int -> t
 val addcst : int -> t -> t

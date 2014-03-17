@@ -10,15 +10,16 @@ let singleton i =
   { bottom with cp = Ints.singleton i }
 
 
-let has v d = Ints.mem v d.cp
+let has v d = Ints.mem v d.cp || Int_interv.mem v d.int
 
 let is_one d env =
-  Ints.cardinal d.cp = 1 &&
-  is_bottom env { d with cp = bottom.cp }
+  let d = Int.import_cp d in
+  (Int_interv.unique d.int) &&
+  is_bottom env { d with int = bottom.int }
+  
 
 let restrict ?v d =
   match v with
-    Some v -> singleton v
-  | None -> { bottom with cp = d.cp }
-
+    Some v -> { (singleton v) with expr = d.expr }
+  | None -> { bottom with cp = d.cp; expr = d.expr }
 

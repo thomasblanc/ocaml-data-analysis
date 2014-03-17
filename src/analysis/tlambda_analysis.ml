@@ -50,22 +50,21 @@ let warn ~env msg = print_endline msg; env
 let rec constraint_env_cp_var id cp env =
   let d = get_env id env in
   let es = d.expr in
-  if Cps.has cp d
-  then
-    if Cps.is_one d env
-    then env
-    else
-      begin
-        constraint_env_cp_exprs es cp env
-        |> set_env id (Cps.restrict ~v:cp d)
-      end
-  else if Data.is_top d
-  then
-    begin
+  if Hinfos.is_empty es
+  then Envs.bottom
+  else
+    let general () =
       constraint_env_cp_exprs es cp env
       |> set_env id (Cps.restrict ~v:cp d)
-    end
-  else Envs.bottom
+    in
+    if Cps.has cp d
+    then
+      if Cps.is_one d env
+      then env
+      else general ()
+    else if Data.is_top d
+    then general ()
+    else Envs.bottom
 
 and constraint_env_cp_exprs es cp env =
   Hinfos.fold
@@ -74,6 +73,9 @@ and constraint_env_cp_exprs es cp env =
 
 and constraint_env_cp expr cp env =
   assert(cp >= 0);
+  let get i = get_env i env in
+  let set i x = set_env i x env in
+  (* let act x = Exprs.set x expr in *)
   match expr with
   | Var x -> constraint_env_cp_var x cp env
   | Prim ( p, l ) ->
@@ -84,16 +86,16 @@ and constraint_env_cp expr cp env =
         then Envs.bottom
         else
           let c = may_rev_comp c cp in
-          let x' = get_env x env
-          and y' = get_env y env in
+          let x' = get x
+          and y' = get y in
           let (x',y') = Int.make_comp c x' y' in
-          set_env x x' env
+          set x x'
           |> set_env y y'
       | TPsetfield _, _::_::[]
       | TPsetfloatfield _, _::_::[]
         when cp = 0 -> env
       | TPfield i, [b] ->
-        let ids = Blocks.get_field i (get_env b env) in
+        let ids = Blocks.get_field i (get b) in
         Ids.fold
           (fun id acc ->
              Envs.join acc
@@ -102,16 +104,24 @@ and constraint_env_cp expr cp env =
       | TPnot, [x] when cp < 2 ->
         constraint_env_cp_var x (1-cp) env
       | TPisint, [x] when cp = 0 ->
-        set_env x ( Int.restrict_not_intcp (get_env x env) ) env
+        set_env x ( Int.restrict_not_intcp (get x) ) env
       | TPisint, [x] when cp = 1 ->
-        set_env x ( Int.restrict_intcp (get_env x env) ) env
-      | TPisout, [x;y;z] when cp = 0 -> warn ~env "TODO: isout"
-      | TPisout, [x;y;z] when cp = 1 -> warn ~env "TODO: isout"
+        set_env x ( Int.restrict_intcp (get x) ) env
+      | TPisout, [m;i] ->
+        if cp > 1
+        then Envs.bottom
+        else
+          let dm, di = Int.make_is_out (cp = 1) (get m) (get i) in
+          set m dm |> set_env i di
       | TPbittest, [x] when cp = 0 -> warn ~env "TODO: bittest"
       | TPbittest, [x] when cp = 1 -> warn ~env "TODO: bittest"
       | TPctconst Lambda.Word_size, [] -> Envs.bottom
       | TPctconst _, [] when cp < 2 -> env (* to correct ? *)
-      | _, _ -> Envs.bottom
+      | TPoffsetint i, [x] ->
+        if cp - i >= 0
+        then constraint_env_cp_var x (cp-i) env
+        else Envs.bottom
+      | _, _ -> assert false
     end
   | _ -> env
 
@@ -188,7 +198,6 @@ sig
      and type vertex_attribute = vattr
      and type graph_attribute = gattr
      and type abstract = Data.environment
-  val exn_tid : tid
 end
   = functor ( E : Entry ) ->
   struct
@@ -315,7 +324,7 @@ end
         in
         match action with
         | App | App_prep _ | App_return | App_exn | Lazyforce _ | Ccall _ | Send _ -> assert false
-        | Var i -> set ( act (get i) )
+        | Var i -> sa (get i)
         | Const c ->
           let env,d =
             try env, HedgeTbl.find constant_table hedge_id with
@@ -415,14 +424,19 @@ end
               let ids = Arrays.get (get a) in
               sa ( Data.union_ids env ids)
             | TParraysetu _, [ai;_;i] ->
-              env
+              env (* TODO : act *)
               |> set_env ai ( Arrays.set (get ai) i )
               |> unit
 
             (* Test if the argument is a block or an immediate integer *)
             | TPisint, [x] -> sa ( Int.is_int env (get x) )
             (* Test if the (integer) argument is outside an interval *)
-            | TPisout, [x;y;z] -> sa ( Int.is_out (get x) (get y) (get z) )
+            | TPisout, [m;i] ->
+              let dm = get m and di = get i in
+              let res, dm, di = Int.is_out dm di in
+              sa res
+              |> set_env m dm
+              |> set_env i di
 
 (*
 (* Bitvect operations *)
@@ -502,6 +516,8 @@ end
               dsaw str
           end
         | Constraint c ->
+          (* Format.printf "Constraining %a@." *)
+          (*   (fun pp id -> Data.print pp id env) id; *)
           begin
             match c with
             | Ccp cp  -> constraint_env_cp_var id cp env

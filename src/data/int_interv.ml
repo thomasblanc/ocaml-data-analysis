@@ -47,6 +47,19 @@ let print fmt x =
       fprintf fmt "[%i,%i]" a b
   | None -> pp_print_string fmt "bot"
 
+let mem x = function
+  | Some (a,b) when a <= x && x <= b -> true
+  | Some _ | None -> false
+
+let cardinal = function
+  | None -> Some 0
+  | Some (x,y) when x = min_int || y = max_int -> None
+  | Some (x,y) -> Some (y-x)
+
+let unique = function
+  | Some (x,y) when x = y -> true
+  | None | Some _ -> false
+
 let meet x y =
   match x, y with
   | None, _ | _, None -> None
