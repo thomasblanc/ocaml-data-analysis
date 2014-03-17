@@ -244,7 +244,6 @@ let init ~modulename funs =
   let mk_tid name = ( modulename, Id.create ~name () ) in
   let g = create () in
   let nf = Hashtbl.length funs in
-  let exn_id = mk_tid "$exn" in
 
   let fun_descs = Hashtbl.create nf in
 
@@ -289,7 +288,7 @@ let init ~modulename funs =
           }
     end
     funs;
-  ( g, fun_descs, exn_id )
+  ( g, fun_descs )
 
 let mk_subgraph ~g ~modulename ~exn_id main =
   let nv = nv ~modulename in
@@ -302,11 +301,13 @@ let mk_subgraph ~g ~modulename ~exn_id main =
 let mk_graph ~modulename funs tlam =
   let nv = nv ~modulename in
   let mk_tid name = ( modulename, Id.create ~name () ) in
-  let ( g, fun_descs, exn_id ) = init ~modulename funs in
+  let ( g, fun_descs ) = init ~modulename funs in
   let inv = nv g and outv = nv g and exnv = nv g in
   let ret_id = mk_tid "$ret" in
-  tlambda ~g ~mk_tid ~modulename ~inv ~outv ~exnv ~ret_id ~exn_id tlam;
-  ( g, fun_descs, inv, outv, exnv, exn_id, ret_id )
+  tlambda ~g ~mk_tid ~modulename
+    ~inv ~outv ~exnv
+    ~ret_id ~exn_id:exn_tid tlam;
+  ( g, fun_descs, inv, outv, exnv, exn_tid, ret_id )
 
 
 let merge_graphs ~g subs =

@@ -29,7 +29,6 @@ module M : functor ( E : Entry ) ->
        and type vertex_attribute = vattr
        and type graph_attribute = gattr
        and type abstract = Data.environment
-    val exn_tid : tid
   end
 
 val get_counter : unit -> int

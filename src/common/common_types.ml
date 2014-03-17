@@ -52,6 +52,11 @@ struct
     ( "", { stamp = !idref; name = ( "$$" ^ name ); flags = 0; } )
 end
 
+let fun_tid = TId.create ()
+let ret_tid = TId.create ()
+let exn_tid = TId.create ()
+let arg_tid = TId.create ()
+
 
 type comparison = Lambda.comparison
 and array_kind = Lambda.array_kind

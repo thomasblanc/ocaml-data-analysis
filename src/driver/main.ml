@@ -82,7 +82,7 @@ let () =
           Format.pp_print_string ppf "I found something:\n";
           Data.print
             ppf
-            Manager.exn_tid
+            Common_types.exn_tid
             exn_env;
           exit 1
         end

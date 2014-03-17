@@ -230,11 +230,6 @@ end
     let clone_vertex _ = E.mk_vertex ()
     let clone_hedge _ = E.mk_hedge ()
 
-    let fun_tid = TId.create ()
-    let ret_tid = TId.create ()
-    let exn_tid = TId.create ()
-    let arg_tid = TId.create ()
-
     let constant_table = HedgeTbl.create 65536
 
     let builtin_match_failure = Strings.singleton "Match_failure"

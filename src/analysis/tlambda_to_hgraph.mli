@@ -63,7 +63,7 @@ type hg = ( vattr, hattr, gattr ) G.graph
 val init :
   modulename : string ->
   ( Data.f, Tlambda.tlambda ) Hashtbl.t ->
-  hg * ( Data.f, fun_desc ) Hashtbl.t * tid
+  hg * ( Data.f, fun_desc ) Hashtbl.t
 
 (*
    takes the last tid number and the fun hashtbl
