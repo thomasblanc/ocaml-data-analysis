@@ -30,7 +30,7 @@ let () =
       print_endline "I found something:";
       Data.print
         Format.std_formatter
-        Manager.exn_tid
+        Common_types.exn_tid
         exn_env;
       exit 1
     end
