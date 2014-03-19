@@ -3,6 +3,8 @@ let print_hedge_attribute ppf hattr =
   let aux ppf = function
     | Prim (prim, _) ->
       Print_tlambda.primitive ppf prim
+    | Alloc (prim, _) ->
+      Print_tlambda.allocator ppf prim
     | App_prep _ ->
       Format.fprintf ppf "App_prep"
     | App ->

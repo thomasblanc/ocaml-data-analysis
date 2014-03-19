@@ -48,14 +48,17 @@ let list_of_one f = function
 let warn ~env msg = print_endline msg; env
 
 let rec constraint_env_cp_var id cp env =
-  let d = get_env id env in
+  constraint_env_cp_id (get_ident id env) cp env
+
+and constraint_env_cp_id i cp env =
+  let d = get_data i env in
   let es = d.expr in
   if Hinfos.is_empty es
   then Envs.bottom
   else
     let general () =
       constraint_env_cp_exprs es cp env
-      |> set_env id (Cps.restrict ~v:cp d)
+      |> set_data i (Cps.restrict ~v:cp d)
     in
     if Cps.has cp d
     then
@@ -74,7 +77,9 @@ and constraint_env_cp_exprs es cp env =
 and constraint_env_cp expr cp env =
   assert(cp >= 0);
   let get i = get_env i env in
-  let set i x = set_env i x env in
+  let getd i = get_data i env in
+  let setd i x = set_data i x env in
+  let geti i = get_ident i env in
   (* let act x = Exprs.set x expr in *)
   match expr with
   | Var x -> constraint_env_cp_var x cp env
@@ -86,33 +91,36 @@ and constraint_env_cp expr cp env =
         then Envs.bottom
         else
           let c = may_rev_comp c cp in
-          let x' = get x
-          and y' = get y in
+          let ix = geti x and iy = geti y in
+          let x' = getd ix and y' = getd iy in
           let (x',y') = Int.make_comp c x' y' in
-          set x x'
-          |> set_env y y'
+          setd ix x'
+          |> set_data iy y'
       | TPsetfield _, _::_::[]
       | TPsetfloatfield _, _::_::[]
         when cp = 0 -> env
       | TPfield i, [b] ->
         let ids = Blocks.get_field i (get b) in
         Ids.fold
-          (fun id acc ->
+          (fun i acc ->
              Envs.join acc
-               ( constraint_env_cp_var id cp env)
+               ( constraint_env_cp_id i cp env)
           ) ids Envs.bottom
       | TPnot, [x] when cp < 2 ->
         constraint_env_cp_var x (1-cp) env
       | TPisint, [x] when cp = 0 ->
-        set_env x ( Int.restrict_not_intcp (get x) ) env
+        let ix = geti x in
+        setd ix ( Int.restrict_not_intcp (getd ix) )
       | TPisint, [x] when cp = 1 ->
-        set_env x ( Int.restrict_intcp (get x) ) env
+        let ix = geti x in
+        setd ix ( Int.restrict_intcp (getd ix) )
       | TPisout, [m;i] ->
         if cp > 1
         then Envs.bottom
         else
-          let dm, di = Int.make_is_out (cp = 1) (get m) (get i) in
-          set m dm |> set_env i di
+          let im = geti m and ii = geti i in
+          let dm, di = Int.make_is_out (cp = 1) (getd im) (getd ii) in
+          setd im dm |> set_data ii di
       | TPbittest, [x] when cp = 0 -> warn ~env "TODO: bittest"
       | TPbittest, [x] when cp = 1 -> warn ~env "TODO: bittest"
       | TPctconst Lambda.Word_size, [] -> Envs.bottom
@@ -126,7 +134,10 @@ and constraint_env_cp expr cp env =
   | _ -> env
 
 let rec constraint_env_tag_var id tag env =
-  let d = get_env id env in
+  constraint_env_tag_id (get_ident id env) tag env
+
+and constraint_env_tag_id i tag env =
+  let d = get_data i env in
   let l = d.expr in
   if Blocks.has_tag tag d
   then
@@ -135,7 +146,7 @@ let rec constraint_env_tag_var id tag env =
     else
       begin
         constraint_env_tag_exprs l tag env
-        |> set_env id (Blocks.restrict ~tag d)
+        |> set_data i (Blocks.restrict ~tag d)
       end
   else Envs.bottom
 
@@ -154,18 +165,23 @@ and constraint_env_tag expr tag env =
   | Ccall (_, _)
   | Send (_, _) -> env
   | App | App_return | App_exn -> assert false
-  | Prim ( p, l ) ->
+  | Alloc ( p, l ) ->
     begin
       match p with
       | TPmakeblock (t, _) when t = tag ->  env
-      | TPfield i ->
+      | _ -> Envs.bottom
+    end
+  | Prim ( p, l ) ->
+    begin
+      match p with
+      | TPfield f ->
         list_of_one (fun b ->
             let b = get_env b env in
             Ids.fold
-              (fun id acc ->
+              (fun i acc ->
                  Envs.join acc
-                   ( constraint_env_tag_var id tag env)
-              ) ( Blocks.get_field i b) Envs.bottom
+                   ( constraint_env_tag_id i tag env)
+              ) (Blocks.get_field f b) Envs.bottom
           ) l
       | TPduprecord _ when tag = 0 ->
         list_of_one (fun b -> constraint_env_tag_var b tag env ) l
@@ -289,7 +305,7 @@ end
           List.fold_left
             (fun (env,ids) c ->
                let env,d = constant env c in
-               let env,i = reg_env d env in
+               let env,i = reg_data d env in
                env,i::ids )
             (env,[]) l
         in
@@ -299,7 +315,7 @@ end
         let ids,env =
           List.fold_left
             (fun (ids,env) f ->
-               let env,id = reg_env (Floats.singleton f) env in
+               let env,id = reg_data (Floats.singleton f) env in
                (id::ids, env)
             ) ([], env) l in
         env, Arrays.singleton ids ( Int_interv.cst (List.length l)) Pfloatarray
@@ -313,6 +329,9 @@ end
       let in_apply ( id, action) env =
         let set x = set_env id x env
         and get x = get_env x env
+        and geti x = get_ident x env
+        and getd x = get_data x env
+        and setd i x = set_data i x env
         (* and vunit = Cp.singleton 0 *)
         and act d = Exprs.set d action
         in
@@ -323,7 +342,8 @@ end
           warn ~env msg
         in
         match action with
-        | App | App_prep _ | App_return | App_exn | Lazyforce _ | Ccall _ | Send _ -> assert false
+        | App | App_prep _ | App_return | App_exn
+        | Alloc _ | Lazyforce _ | Ccall _ | Send _ -> assert false
         | Var i -> sa (get i)
         | Const c ->
           let env,d =
@@ -339,25 +359,21 @@ end
             match p, l with
             | TPbuiltin, [i] -> sa ( builtin_of_id i )
             (* Operations on heap blocks *)
-            | TPmakeblock ( tag, _), _ ->
-              let a = Array.of_list l in
-              sa ( Blocks.singleton tag a )
             | TPfield i, [b] ->
+              let ib = geti b in
               let env =
-                set_env b
-                  ( Blocks.restrict ~has_field:i ( get b))
-                  env in
-              let ids = Blocks.get_field i ( get_env b env) in
+                setd ib ( Blocks.restrict ~has_field:i ( get_data ib env)) in
+              let ids = Blocks.get_field i ( get_data ib env) in
               set_env id
                 ( act
                     ( Ids.fold
-                        (fun id d -> union (get_env id env) d )
+                        (fun i d -> union (get_data i env) d )
                         ids Data.bottom )
                 )
                 env
             | TPsetfield ( i, _ ), [b;v] ->
-              env
-              |> set_env b ( Blocks.set_field i v (get b) )
+              let ib = geti b in
+              setd ib ( Blocks.set_field i (geti v) (getd ib) )
               |> unit
 
             | TPfloatfield i, [b] -> dsaw "TODO: floatfield"
@@ -388,23 +404,26 @@ end
             | TPoffsetint i, [x] ->
               sa ( Int.op1 (Int_interv.addcst i) ( get x) )
             | TPoffsetref i, [x] ->
-              let b = get x in
+              let ix = geti x in
+              let b = getd ix in
               let b = Blocks.restrict ~tag:0 ~size:1 b in
               let ids = Blocks.get_field 0 b in
               let env, ids =
                 Ids.fold
                   (fun idbang (env,ids) ->
-                     let bang = get_env idbang env in
+                     let bang = get_data idbang env in
                      let (env,idbang') =
-                       reg_env
+                       reg_data
                          ( Exprs.set
                              (Int.op1 (Int_interv.addcst i) bang)
-                             (Prim (TPoffsetref i, [idbang]))
+                             (Prim (TPoffsetref i, [x]))
                          )
                          env in
                      env, Ids.add idbang' ids
                   ) ids ( env, Ids.empty ) in
-              unit ( set_env x ( act ( Blocks.make_basic 0 1 [| ids|] ) ) env )
+              env
+              |> set_data ix ( act ( Blocks.make_basic 0 1 [| ids|] ) )
+              |> unit
             (*
 (* Float operations *)
 | TPintoffloat | TPfloatofint
@@ -415,8 +434,6 @@ end
 | TPstringlength | TPstringrefu | TPstringsetu | TPstringrefs | TPstringsets *)
 
             (* Array operations *)
-            | TPmakearray k, l ->
-              sa ( Arrays.singleton l ( Int_interv.cst (List.length l)) k )
             | TParraylength _, [x] ->
               let a = get x in
               sa ( Int.of_interv (Arrays.size a) )
@@ -424,19 +441,20 @@ end
               let ids = Arrays.get (get a) in
               sa ( Data.union_ids env ids)
             | TParraysetu _, [ai;_;i] ->
-              env (* TODO : act *)
-              |> set_env ai ( Arrays.set (get ai) i )
-              |> unit
-
+              let ai = geti ai in
+              let ii = geti i in
+              let ad = act ( Arrays.set (getd ai) ii ) in
+              setd ai ad |> unit
             (* Test if the argument is a block or an immediate integer *)
             | TPisint, [x] -> sa ( Int.is_int env (get x) )
             (* Test if the (integer) argument is outside an interval *)
             | TPisout, [m;i] ->
-              let dm = get m and di = get i in
+              let im = geti m and ii = geti i in
+              let dm = getd im and di = getd ii in
               let res, dm, di = Int.is_out dm di in
               sa res
-              |> set_env m dm
-              |> set_env i di
+              |> set_data im dm
+              |> set_data ii di
 
 (*
 (* Bitvect operations *)
@@ -499,14 +517,12 @@ end
               (* at this point, f is unique *)
               let x = Funs.field i (get f) env in
               sa x
-
             | TPgetfun fid, [] ->
               let value = get fun_tid in
               if Funs.has_fid fid value
               then sa ( Funs.fid fid (get fun_tid ) )
                    |> rm_env fun_tid
               else Envs.bottom
-            | TPfun fid, _ -> sa ( Funs.mk fid l )
             | TPgetarg, [] -> sa ( get arg_tid )
               |> rm_env arg_tid
             (* Lastly, if everything fails, it means there's still work to get done !*)
@@ -517,7 +533,7 @@ end
           end
         | Constraint c ->
           (* Format.printf "Constraining %a@." *)
-          (*   (fun pp id -> Data.print pp id env) id; *)
+          (*   (fun pp id -> Print_data.print pp id env) id; *)
           begin
             match c with
             | Ccp cp  -> constraint_env_cp_var id cp env
@@ -525,9 +541,34 @@ end
           end
         | Return id ->
           Format.printf "ret %a@."
-            (fun ppf id -> Data.print ppf id env) id;
+            (fun ppf id -> Print_data.print ppf id env) id;
           set_env ret_tid ( get_env id env ) env
         | Retexn id -> set_env exn_tid ( get_env id env ) env
+      in
+      let on_allocs l env =
+        let env, l = List.fold_left
+          (fun (env,l) (id,a) ->
+             let (env,i) = reg_env id env in
+             (env, (i,a)::l))
+          (env,[]) l in
+        List.fold_left
+          (fun env -> function
+             | i, ( Alloc (p,l) as action ) ->
+               let act d = Exprs.set d action in
+               let l = List.map (fun id -> get_ident id env) l in
+               begin
+                 match p with
+                 | TPfun fid -> set_data i ( act ( Funs.mk fid l ) ) env
+                 | TPmakearray k ->
+                   set_data i
+                     ( act ( Arrays.singleton l ( Int_interv.cst (List.length l)) k ) )
+                     env
+                 | TPmakeblock ( tag, _) ->
+                   let a = Array.of_list l in
+                   set_data i ( act ( Blocks.singleton tag a ) ) env
+               end
+             | _, _ -> assert false
+          ) env l
       in
       assert ( Array.length envs = 1 );
       let env = envs.(0) in
@@ -545,14 +586,14 @@ end
           |> set_env arg_tid ( get_env x env )
         in
         Format.printf "app_pre fun_tid %a@.arg_tid %a@."
-          (fun ppf id -> Data.print ppf id env) fun_tid
-          (fun ppf id -> Data.print ppf id env) arg_tid;
+          (fun ppf id -> Print_data.print ppf id env) fun_tid
+          (fun ppf id -> Print_data.print ppf id env) arg_tid;
         ( [| env |], [] )
       | [ _, App ] ->
         let f = get_env fun_tid env in
         let l = Funs.extract_ids f in
         Format.printf "apply %b@.%a@." (is_bottom f env)
-          (fun ppf () -> Data.print ppf fun_tid env) ();
+          (fun ppf () -> Print_data.print ppf fun_tid env) ();
         List.iter (fun f -> Format.printf "outfunction %a@." Function_id.print f) l;
         [| Envs.bottom; Envs.bottom |], l
       | [ id, App_return ] -> simpleout ( set_env id ( get_env ret_tid env) env )
@@ -566,6 +607,8 @@ end
       | [ id, ( Send (_, _) as a ) ] ->
         print_endline "Unsupported Lazyforce and object method";
         [|set_env id ( Exprs.set Data.top a ) env; Envs.bottom |], []
+      | [_, Alloc _] | _::_::_ -> [| on_allocs l env |], []
+      | [ id, action] -> [| in_apply (id,action) env |], []
       | _ -> [|aux env l|], []
 
   end

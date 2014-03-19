@@ -74,7 +74,7 @@ and trec ppf { tr_decls; tr_in } =
   List.iter (fun ( i, p, args) ->
       fprintf ppf "@[%a@ =@ %a@ %a@]"
         TId.print_simple i
-        primitive p
+        allocator p
         id_list args
     ) tr_decls;
   fprintf ppf "@] in@ %a@]"
@@ -89,6 +89,8 @@ and tcontrol ppf = function
     fprintf ppf "apply@ %a@ %a" TId.print_simple f TId.print_simple arg
   | Tprim (p,args) ->
     fprintf ppf "%a%a" primitive p id_list args
+  | Talloc (p,args) ->
+    fprintf ppf "%a%a" allocator p id_list args
   | Tswitch (case, sw) ->
     let switch ppf sw =
       let spc = ref false in
@@ -149,11 +151,21 @@ and tcontrol ppf = function
     fprintf ppf "%a#%a"
       TId.print_simple o TId.print_simple m
 
-and primitive ppf p =
+and allocator ppf p =
   let open Asttypes in
   let open Lambda in
   match p with
   | TPfun f -> fprintf ppf "fun %a" F.print f
+  | TPmakeblock (tag, Immutable) ->
+    fprintf ppf "makeblock(%i)" tag
+  | TPmakeblock (tag, Mutable) ->
+    fprintf ppf "makemutable(%i)" tag
+  | TPmakearray _ -> fprintf ppf "makearray "
+
+and primitive ppf p =
+  let open Asttypes in
+  let open Lambda in
+  match p with
   | TPgetfun f -> fprintf ppf "getfun %a" F.print f
   | TPfunfield i -> fprintf ppf "funfield %i" i
   | TPgetarg -> fprintf ppf "getarg"
@@ -171,10 +183,7 @@ and primitive ppf p =
   | TPlslint -> fprintf ppf "lsl"
   | TPlsrint -> fprintf ppf "lsr"
   | TPasrint -> fprintf ppf "asr"
-  | TPmakeblock (tag, Immutable) ->
-    fprintf ppf "makeblock(%i)" tag
-  | TPmakeblock (tag, Mutable) ->
-    fprintf ppf "makemutable(%i)" tag
+
   | TPintcomp(Ceq) -> fprintf ppf "=="
   | TPintcomp(Cneq) -> fprintf ppf "!="
   | TPintcomp(Clt) -> fprintf ppf "<"
@@ -189,26 +198,30 @@ and primitive ppf p =
   | TPsubfloat -> fprintf ppf "-."
   | TPmulfloat -> fprintf ppf "*."
   | TPdivfloat -> fprintf ppf "/."
+
   | TPfloatcomp(Ceq) -> fprintf ppf "==."
   | TPfloatcomp(Cneq) -> fprintf ppf "!=."
   | TPfloatcomp(Clt) -> fprintf ppf "<."
   | TPfloatcomp(Cle) -> fprintf ppf "<=."
   | TPfloatcomp(Cgt) -> fprintf ppf ">."
   | TPfloatcomp(Cge) -> fprintf ppf ">=."
+
   | TPstringlength -> fprintf ppf "string.length"
   | TPstringrefu -> fprintf ppf "string.unsafe_get"
   | TPstringsetu -> fprintf ppf "string.unsafe_set"
   | TPstringrefs -> fprintf ppf "string.get"
   | TPstringsets -> fprintf ppf "string.set"
+
   | TParraylength _ -> fprintf ppf "array.length"
-  | TPmakearray _ -> fprintf ppf "makearray "
   | TParrayrefu _ -> fprintf ppf "array.unsafe_get"
   | TParraysetu _ -> fprintf ppf "array.unsafe_set"
   | TParrayrefs _ -> fprintf ppf "array.get"
   | TParraysets _ -> fprintf ppf "array.set"
+
   | TPisint -> fprintf ppf "isint"
   | TPisout -> fprintf ppf "isout"
   | TPbittest -> fprintf ppf "testbit"
+
   | TPstring_load_16(unsafe) ->
      if unsafe then fprintf ppf "string.unsafe_get16"
      else fprintf ppf "string.get16"
@@ -245,8 +258,10 @@ and primitive ppf p =
   | TPbigstring_set_64(unsafe) ->
      if unsafe then fprintf ppf "bigarray.array1.unsafe_set64"
      else fprintf ppf "bigarray.array1.set64"
+
   | TPbswap16 -> fprintf ppf "bswap16"
   | TPbbswap(bi) -> print_boxed_integer "bswap" ppf bi
+
   | TPfield n -> fprintf ppf "field %i" n
   | TPsetfield(n, ptr) ->
       let instr = if ptr then "setfield_ptr " else "setfield_imm " in
@@ -254,6 +269,7 @@ and primitive ppf p =
   | TPfloatfield n -> fprintf ppf "floatfield %i" n
   | TPsetfloatfield n -> fprintf ppf "setfloatfield %i" n
   | TPduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
+
   | TPnot -> fprintf ppf "not"
   | TPoffsetint n -> fprintf ppf "%i+" n
   | TPoffsetref n -> fprintf ppf "+:=%i"n
@@ -278,11 +294,13 @@ and primitive ppf p =
   | TPbintcomp(bi, Cgt) -> print_boxed_integer ">" ppf bi
   | TPbintcomp(bi, Cle) -> print_boxed_integer "<=" ppf bi
   | TPbintcomp(bi, Cge) -> print_boxed_integer ">=" ppf bi
+
   | TPbigarrayref(unsafe, n, kind, layout) ->
       print_bigarray "get" unsafe kind ppf layout
   | TPbigarrayset(unsafe, n, kind, layout) ->
       print_bigarray "set" unsafe kind ppf layout
   | TPbigarraydim(n) -> fprintf ppf "Bigarray.dim_%i" n
+
   | TPctconst c ->
      let const_name = match c with
        | Big_endian -> "big_endian"

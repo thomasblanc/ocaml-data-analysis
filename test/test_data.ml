@@ -71,7 +71,7 @@ module Env = struct
       prepared_call : prepared_call option }
 
   let get_union ids env =
-    Ids.fold (fun id v -> union (get_env id env) v) ids bottom
+    Ids.fold (fun id v -> union (get_data id env) v) ids bottom
 
   let any_int =
     { bottom with int = Int_interv.top }
@@ -87,6 +87,10 @@ module Env = struct
 
   let set_env id data env =
     env_v (set_env id data env.env)
+  let set_data i data env =
+    env_v (set_data i data env.env)
+
+  let get_ident id env = get_ident id env.env
 
   let set_constraint id constr { env } =
     let env, value = intersect_noncommut env (get_env id env) constr in
@@ -143,7 +147,7 @@ module Env = struct
       let f = (get_union closure abs.env).f in
       let used_closure = Fm.find func_id f in
       let closure_val = func_val' func_id used_closure in
-      let abs = Ids.fold (fun id acc -> set_env id closure_val acc) closure abs in
+      let abs = Ids.fold (fun id acc -> set_data id closure_val acc) closure abs in
       abs, used_closure
 
   let access_closure abs dst func_id pos =
@@ -246,14 +250,15 @@ module Manager = struct
 
   let apply hedge attr tabs =
     let abs = tabs.(0) in
+    let geti x = Env.get_ident x abs in
     Printf.eprintf "%s %s\n%!" hedge (hedge_attr_to_string attr);
     match attr with
     | Set_int (id,cst) ->
       [|Env.set_int abs id cst|], [] (* id <- cst *)
     | Set_closure (fun_id, funct, id_arr ) ->
-      [|Env.set_closure abs fun_id funct id_arr|], [] (* f <- closure{a} *)
+      [|Env.set_closure abs fun_id funct (Array.map geti id_arr)|], [] (* f <- closure{a} *)
     | Prepare_call (fun_id, clos_id) ->
-      [|Env.prepare_call abs fun_id clos_id|], [] (* prepare call f b *)
+      [|Env.prepare_call abs (geti fun_id) (geti clos_id)|], [] (* prepare call f b *)
     | Call ->
       Env.call abs
     | Access_closure(id, funct, n) ->
@@ -303,7 +308,8 @@ let print_env ppf attr =
   | Bottom -> fprintf ppf "Bottom"
   | Env env ->
     fprintf ppf "{@[ ";
-    Idm.iter (fun (_,id) _ -> fprintf ppf "%a " Id.print id) env;
+    pp_print_string ppf "No env printer available";
+    (* Idm.iter (fun (_,id) _ -> fprintf ppf "%a " Id.print id) env; *)
     fprintf ppf "@]}"
 
 let print_attrvertex ppf vertex attr =

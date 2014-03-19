@@ -18,7 +18,6 @@ let zeroint =  Const_base ( Asttypes.Const_int 0 )
 
 let prim_translate = function
   (* Operations on heap blocks *)
-  | Pmakeblock ( i, m) -> TPmakeblock ( i, m)
   | Pfield i -> TPfield i
   | Psetfield ( i, b) -> TPsetfield ( i, b)
   | Pfloatfield i -> TPfloatfield i
@@ -57,7 +56,6 @@ let prim_translate = function
   | Pstringrefu -> TPstringrefu
   | Pstringsetu -> TPstringsetu
   (* Array operations *)
-  | Pmakearray k -> TPmakearray k
   | Parraylength k -> TParraylength k
   | Parrayrefu k -> TParrayrefu k
   | Parraysetu k -> TParraysetu k
@@ -109,6 +107,11 @@ let prim_translate = function
   (* byte swap *)
   | Pbswap16 -> TPbswap16
   | Pbbswap k -> TPbbswap k
+  | _ -> assert false
+
+let alloc_translate = function
+  | Pmakeblock ( i, m) -> TPmakeblock ( i, m)
+  | Pmakearray k -> TPmakearray k
   | _ -> assert false
 
 
@@ -295,7 +298,7 @@ let lambda_to_tlambda ~modname ~funs code =
         ( Lapply ( Lapply ( f, [arg], loc ), args, loc ))
     | Lfunction ( _, [arg], body ) ->
       let fv, f, l = fun_create Ids.empty nfv fv arg body in
-      mk_tlet rv nfv fv stack ( Tprim ( f, List.map tid l ) )
+      mk_tlet rv nfv fv stack ( Talloc ( f, List.map tid l ) )
     | Lfunction ( k, arg::args, body ) ->
       tcontrol rv nfv fv stack
         ( Lfunction ( k, [arg], Lfunction (k,args,body) ) )
@@ -535,7 +538,9 @@ let lambda_to_tlambda ~modname ~funs code =
           tl ( Tprim ( TPdivbint k, [tid a;tid b]))
         | Pmodbint k, [a;b;_] ->
           tl ( Tprim ( TPmodbint k, [tid a;tid b]))
-        | p, l ->
+        | Pmakearray _, _ | Pmakeblock _, _ ->
+          tl ( Talloc ( alloc_translate p, List.map tid l) )
+        | _, _ ->
           tl ( Tprim ( prim_translate p, List.map tid l ) )
       end
 
@@ -579,7 +584,7 @@ let lambda_to_tlambda ~modname ~funs code =
           match lam with
           | Lprim ( p, l ) ->
             let fv, l = lcheck rv nfv fv ( get_vars l) in
-            let p = prim_translate p in
+            let p = alloc_translate p in
             fv, ( tid i, p, List.map tid l )
           | Lfunction ( _, [arg], body ) ->
             let fv, f, l = fun_create rv nfv fv arg body in

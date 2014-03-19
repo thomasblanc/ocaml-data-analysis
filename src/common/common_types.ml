@@ -70,7 +70,6 @@ and direction_flag = Asttypes.direction_flag
 type primitive =
   | TPbuiltin
   (* Operations on heap blocks *)
-  | TPmakeblock of int * Asttypes.mutable_flag
   | TPfield of int
   | TPsetfield of int * bool
   | TPfloatfield of int
@@ -93,7 +92,6 @@ type primitive =
   (* String operations *)
   | TPstringlength | TPstringrefu | TPstringsetu | TPstringrefs | TPstringsets
   (* Array operations *)
-  | TPmakearray of array_kind
   | TParraylength of array_kind
   | TParrayrefu of array_kind
   | TParraysetu of array_kind
@@ -148,16 +146,21 @@ type primitive =
   | TPbswap16
   | TPbbswap of boxed_integer
   (* function operations *)
-  | TPfun of F.t
   | TPgetfun of F.t
   | TPfunfield of int
   | TPgetarg
+
+type allocator =
+  | TPmakearray of array_kind
+  | TPmakeblock of int * Asttypes.mutable_flag
+  | TPfun of F.t
 
 
 type hinfo =
   | Var of tid
   | Const of Lambda.structured_constant
   | Prim of primitive * tid list
+  | Alloc of allocator * tid list
   | Constraint of constr
   | App_prep of tid * tid (* function, argument *)
   | App | App_return | App_exn

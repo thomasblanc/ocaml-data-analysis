@@ -80,7 +80,7 @@ let () =
       else
         begin
           Format.pp_print_string ppf "I found something:\n";
-          Data.print
+          Print_data.print
             ppf
             Common_types.exn_tid
             exn_env;

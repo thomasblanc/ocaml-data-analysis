@@ -28,7 +28,7 @@ let () =
   else
     begin
       print_endline "I found something:";
-      Data.print
+      Print_data.print
         Format.std_formatter
         Common_types.exn_tid
         exn_env;

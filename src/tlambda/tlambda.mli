@@ -15,7 +15,7 @@ and tlet =
 
 and trec =
 {
-  tr_decls : ( tid * primitive * tid list ) list;
+  tr_decls : ( tid * allocator * tid list ) list;
   tr_in : tlambda;
 }
 
@@ -24,6 +24,7 @@ and tcontrol =
 | Tconst of Lambda.structured_constant
 | Tapply of tid * tid
 | Tprim of primitive * tid list
+| Talloc of allocator * tid list
 | Tswitch of tid * tswitch
 | Tstaticraise of int * tid list
 | Tstaticcatch of tlambda * (int * tid list) * tlambda

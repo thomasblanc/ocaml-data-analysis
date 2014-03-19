@@ -66,7 +66,7 @@ let rec tlambda (funs:fun_table) (env:env) = function
     let env =
       List.fold_left
         (fun env (i,p,l) ->
-           set_env env i ( call_prim env funs p l )
+           set_env env i ( call_alloc env funs p l )
         )
         env tr_decls in
     tlambda funs env tr_in
@@ -96,6 +96,7 @@ and tcontrol funs env = function
   | Tconst sc -> structured_constant sc
   | Tapply ( f, x) -> call_fun funs (get_env env f) (get_env env x)
   | Tprim ( p, l) -> call_prim env funs p l
+  | Talloc ( p, l) -> call_alloc env funs p l
   | Tswitch ( i, s) ->
     let switch_handle i l =
       let b =
@@ -171,12 +172,16 @@ and call_fun funs f x =
     end
   | _ -> assert false
 
+and call_alloc env funs p l =
+  match p, l with
+  | TPmakeblock (i,_), _ ->  ( Block ( i, List.map ref l))
+  | TPfun i, _ -> Fun ( i, (* List.map g *) l )
+  | _,_ -> failwith "TODO: allocators"
+
 and call_prim env funs p l =
   let g i = get_env env i in
   match p, l with
-  (* Utilities *)
   (* Blocks *)
-  | TPmakeblock (i,_), _ ->  ( Block ( i, List.map ref l))
   | TPfield i, [b]
   | TPfloatfield i, [b] ->
     begin
@@ -218,10 +223,7 @@ and call_prim env funs p l =
   | TPintcomp c, [ x; y] -> of_bool ( comparison c ( val_to_int (g x))  ( val_to_int (g y)))
   | TPoffsetint _, _ -> failwith "TODO: ask Pierre"
   | TPoffsetref _, _ -> failwith "TODO: ask Pierre"
-  (* Floats *)
-
-
-  | TPfun i, _ -> Fun ( i, (* List.map g *) l )
+  (* Functions *)
   | TPfunfield i, [] ->
     begin
       match g id_fun with

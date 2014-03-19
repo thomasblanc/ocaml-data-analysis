@@ -61,9 +61,14 @@ end
 module G = Hgraph.Make (T)
 open G
 
+type vattr = unit
+type hattr = ( tid * hinfo ) list
+type gattr = unit
+type hg = ( vattr, hattr, gattr ) G.graph
+
 type fun_desc =
   {
-    f_graph : ( unit, (tid * hinfo) list, unit ) G.graph;
+    f_graph : hg;
     f_in : Vertex.t array;
     f_out : Vertex.t array;
     f_vertex : VertexSet.t;
@@ -77,11 +82,6 @@ type mod_desc =
     m_exn : Vertex.t;
     m_return : tid;
   }
-
-type vattr = unit
-type hattr = ( tid * hinfo ) list
-type gattr = unit
-type hg = ( vattr, hattr, gattr ) G.graph
 
 let ctrue = Constraint (Ccp 1)
 let cfalse = Constraint (Ccp 0)
@@ -121,7 +121,7 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
     (* at this point, there are only primitives *)
     let in_out = nv g in
     add_hedge g ( Hedge.mk ())
-      ( List.rev_map (fun ( id, p, args ) -> id, Prim ( p, args ) ) d.tr_decls )
+      ( List.rev_map (fun ( id, p, args ) -> id, Alloc ( p, args ) ) d.tr_decls )
       ~pred:[|entry|] ~succ:[|in_out|];
     tlambda ~g ~outv ~ret_id ~inv:in_out ~exnv ~exn_id d.tr_in
 
@@ -142,6 +142,9 @@ let tlambda ~g ~mk_tid ~modulename ~outv ~ret_id ~exn_id ~inv ~exnv code =
 
     | Tprim ( p, args) ->
       simpleh g id ( Prim ( p, args ) ) ~inv ~outv
+
+    | Talloc ( p, args) ->
+      simpleh g id ( Alloc ( p, args ) ) ~inv ~outv
 
     | Tswitch ( si_id, s) ->
       let switch_handle is_cp (i,lam) =

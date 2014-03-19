@@ -3,11 +3,11 @@ open Data
 let field i f env =
   let l = Fm.fold (fun _ a l -> a.(i)::l) f.f [] in
   match l with
-  | [x] when Ids.cardinal x = 1 -> get_env ( Ids.choose x ) env
+  | [x] when Ids.cardinal x = 1 -> get_data ( Ids.choose x ) env
   | _ ->
     List.fold_left (fun data ids ->
         Ids.fold
-          (fun i data -> union data ( get_env i env ))
+          (fun i data -> union data ( get_data i env ))
           ids data
       ) bottom  l
 
