@@ -19,6 +19,8 @@ val unique : t -> bool
 
 val meet : t -> t -> t
 val cst : int -> t
+val at_least : int -> t
+val at_most : int -> t
 val addcst : int -> t -> t
 
 val uminus : t -> t

@@ -88,6 +88,9 @@ let inter = meet
 
 let cst c = Some (c,c)
 
+let at_least c = Some (c, maximum)
+let at_most c = Some (minimum, c)
+
 let addcst c x =
   match x with
   | None -> x

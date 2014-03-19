@@ -130,7 +130,7 @@ let () =
     if i = 5 then assert(i = 5);
     (* if i <> 5 then assert(i <> 5); *) (* cannot be represented by interval *)
     if i > 5 then assert(i > 5);
-    (* if i < 5 then assert(i < 5); *)
+    (* if i < 5 then assert(i < 5); *) (* need narrowing or smarter widening *)
   done;
 
   ()
@@ -184,14 +184,14 @@ let () =
     | E i -> r := Some i
     | F i -> r := Some (i + 1)
     | _ -> r := Some 0
-  done;
+  done; assert (!r = Some 5);
   (match !r with
    | Some x ->
      (* TODO: add a primitive to help assert that a node is reachable *)
      (* assert_visited () *)
      assert(x = 5)
    | None ->
-     (* assert false; *)
+     assert false;
      ());
 
   for i = 0 to 10 do

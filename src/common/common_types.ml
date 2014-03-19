@@ -168,4 +168,4 @@ type hinfo =
   | Lazyforce of tid
   | Ccall of Primitive.description * tid list
   | Send of tid * tid
-and constr = Ccp of int | Ctag of int
+and constr = Ccp of int | Ctag of int | Cbool of bool

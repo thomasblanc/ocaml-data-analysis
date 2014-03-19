@@ -83,8 +83,8 @@ type mod_desc =
     m_return : tid;
   }
 
-let ctrue = Constraint (Ccp 1)
-let cfalse = Constraint (Ccp 0)
+let ctrue = Constraint (Cbool true)
+let cfalse = Constraint (Cbool false)
 
 let const_unit = Lambda.Const_pointer 0
 

@@ -47,6 +47,80 @@ let list_of_one f = function
 
 let warn ~env msg = print_endline msg; env
 
+let rec constraint_env_bool_var id b env =
+  constraint_env_bool_id (get_ident id env) b env
+
+and constraint_env_bool_id i b env =
+  let d = get_data i env in
+  let es = d.expr in
+  if Hinfos.is_empty es
+  then Envs.bottom
+  else
+    let general g f =
+      if g env d
+      then 
+        constraint_env_bool_exprs es b env
+        |> set_data i (f d)
+      else Envs.bottom
+    in
+    if b
+    then general Ifcond.can_be_true Ifcond.set_true
+    else general Ifcond.can_be_false Ifcond.set_false
+
+and constraint_env_bool_exprs es bool env =
+  Hinfos.fold
+    (fun expr e -> Envs.join e ( constraint_env_bool expr bool env ) )
+    es Envs.bottom
+
+and constraint_env_bool expr bool env =
+  let cp = if bool then 1 else 0 in
+  let get i = get_env i env in
+  let getd i = get_data i env in
+  let setd i x = set_data i x env in
+  let geti i = get_ident i env in
+  match expr with
+  | Var x -> constraint_env_bool_var x bool env
+  | Prim ( p, l ) ->
+    begin
+      match p, l with
+      | TPintcomp c, [x;y]  ->
+        let c = may_rev_comp c cp in
+        let ix = geti x and iy = geti y in
+        let x' = getd ix and y' = getd iy in
+        let (x',y') = Int.make_comp c x' y' in
+        setd ix x'
+        |> set_data iy y'
+      | TPsetfield _, _::_::[]
+      | TPsetfloatfield _, _::_::[]
+        when not bool -> env
+      | TPfield i, [b] ->
+        let ids = Blocks.get_field i (get b) in
+        Ids.fold
+          (fun i acc ->
+             Envs.join acc
+               ( constraint_env_bool_id i bool env)
+          ) ids Envs.bottom
+      | TPnot, [x] ->
+        constraint_env_bool_var x (not bool) env
+      | TPisint, [x] when bool ->
+        let ix = geti x in
+        setd ix ( Int.restrict_intcp (getd ix) )
+      | TPisint, [x] ->
+        let ix = geti x in
+        setd ix ( Int.restrict_not_intcp (getd ix) )
+      | TPisout, [m;i] ->
+        let im = geti m and ii = geti i in
+        let dm, di = Int.make_is_out bool (getd im) (getd ii) in
+        setd im dm |> set_data ii di
+      | TPbittest, [x] when bool -> warn ~env "TODO: bittest"
+      | TPbittest, [x] -> warn ~env "TODO: bittest"
+      | TPctconst Lambda.Word_size, [] -> Envs.bottom
+      | TPctconst _, [] -> env (* to correct ? *)
+      | _, _ -> env
+    end
+  | _ -> env
+
+
 let rec constraint_env_cp_var id cp env =
   constraint_env_cp_id (get_ident id env) cp env
 
@@ -538,6 +612,7 @@ end
             match c with
             | Ccp cp  -> constraint_env_cp_var id cp env
             | Ctag tag -> constraint_env_tag_var id tag env
+            | Cbool b -> constraint_env_bool_var id b env
           end
         | Return id ->
           Format.printf "ret %a@."
