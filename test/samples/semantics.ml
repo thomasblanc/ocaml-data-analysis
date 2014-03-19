@@ -184,7 +184,7 @@ let () =
     | E i -> r := Some i
     | F i -> r := Some (i + 1)
     | _ -> r := Some 0
-  done; assert (!r = Some 5);
+  done;
   (match !r with
    | Some x ->
      (* TODO: add a primitive to help assert that a node is reachable *)
