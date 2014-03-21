@@ -375,7 +375,7 @@ module Fixpoint (T:T) (M:Manager with module T := T) = struct
       vertices_to_update, hedges_to_update, state
 
 
-  let update_vertex narrowing_phase state vertex =
+  let update_vertex start_vertices narrowing_phase state vertex =
     let pred = M.H.HedgeIntSet.elements (SG.vertex_pred' state.graph vertex) in
 
     let hedge_opt state (i,h) =
@@ -406,7 +406,25 @@ module Fixpoint (T:T) (M:Manager with module T := T) = struct
           (* if we are not in the narrowing phase: widen *)
           match narrowing_phase with
           | None ->
-            let abstract = M.widening vertex previous_value abstract in
+            let widen =
+              (* To ensure that any infinite sequence goes throug an
+                 infinite number of widenings, we only need to widen
+                 in loops and only one time per loop. Since each loop
+                 has at least one vertex with 2 predecessor or a
+                 vertex of the loop is in the start vertices, this
+                 restriction is correct. *)
+              match pred with
+              | [_] -> M.H.VertexSet.mem vertex start_vertices
+              | _ -> true
+            in
+            let abstract =
+              if widen
+              then begin
+                (* Format.printf "widen %a@." T.Vertex.print vertex; *)
+                M.widening vertex previous_value abstract
+              end
+              else M.join_list vertex [previous_value; abstract]
+            in
             let propagate = not (M.is_leq vertex abstract previous_value) in
             abstract, propagate
           | Some narrow ->
@@ -443,7 +461,7 @@ module Fixpoint (T:T) (M:Manager with module T := T) = struct
             aux state
         end
       | Some v ->
-        let to_update, state = update_vertex narrowing_phase state v in
+        let to_update, state = update_vertex start_vertices narrowing_phase state v in
         Hwq.push_set hwq to_update;
         aux state
     in
