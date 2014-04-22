@@ -1,5 +1,7 @@
 open Format
+open Locations
 open Data
+open Envs
 open Utils
 open Common_types
 
@@ -63,38 +65,76 @@ module H = Hgraph.Make(T)
 module Env = struct
 
   type prepared_call =
-    { closure : Data.Ids.t;
-      param : Data.Ids.t }
+    { closure : Locations.Locs.t;
+      param : Locations.Locs.t }
 
   type t =
-    { env : Data.environment;
+    { env : Envs.environment;
       prepared_call : prepared_call option }
 
-  let get_union ids env =
-    Ids.fold (fun id v -> union (get_data id env) v) ids bottom
+  let get_env_values = function
+    | Env { values; _ } -> values
+    | Bottom -> assert false
+
+  (* let fold_loc loc f env = *)
+  (*   Locm.fold_key (fun loc d e -> *)
+  (*       let e2 = f loc d env in *)
+  (*       Envs.join e e2 ) *)
+  (*     loc (get_env_values env) Envs.bottom *)
+
+  (* let fold_id id f env = *)
+  (*   let values = get_env_values env in *)
+  (*   let locs = get_idents id env in *)
+  (*   Locs.fold *)
+  (*     (fun loc e -> *)
+  (*        Locm.fold_key (fun loc d e -> *)
+  (*            let e2 = f loc d env in *)
+  (*            Envs.join e e2 ) loc values e) *)
+  (*     locs Envs.bottom *)
+
+  (* let get_union ids env = *)
+  (*   Locs.fold (fun id v -> union (get_data id env) v) ids bottom *)
+
+  let get_union_fids locs { env; _ } =
+    Access.fold_locs (fun _ -> Funs.extract_ids) locs [] env
 
   let any_int =
-    { bottom with int = Int_interv.top }
+    { Data.bottom with int = Int_interv.top }
 
   let func_val func_id closure =
-    { bottom with f = Fm.singleton func_id
-                      (Array.map Ids.singleton closure) }
+    { Data.bottom with f = Fm.singleton func_id
+                      (Array.map Locs.singleton closure) }
 
   let func_val' func_id closure =
-    { bottom with f = Fm.singleton func_id closure }
+    { Data.bottom with f = Fm.singleton func_id closure }
 
   let env_v env = { env; prepared_call = None }
 
   let set_env id data env =
-    env_v (set_env id data env.env)
-  let set_data i data env =
-    env_v (set_data i data env.env)
+    {env with env = Access.set_env id data env.env}
 
-  let get_ident id env = get_ident id env.env
+  let set_data loc data env =
+    {env with
+     env =
+       Access.on_loc
+         (fun loc _ env -> Access.set_data' loc data env)
+         loc
+         env.env;
+    }
 
-  let set_constraint id constr { env } =
-    let env, value = intersect_noncommut env (get_env id env) constr in
-    env_v (Data.set_env id value env)
+  let get_idents tid env = Access.get_idents tid env.env
+
+  let set_constraint tid constr { env; prepared_call } =
+    let env =
+      Access.fold_tid
+        (fun loc d e ->
+           let v = Manipulation.intersect_noncommut d constr in
+           Envs.join (Access.set_data loc v env) e )
+        tid
+        Envs.bottom
+        env
+    in
+    { env; prepared_call }
 
   let set_int env dst cst =
     set_env dst (Int.singleton cst) env
@@ -108,9 +148,15 @@ module Env = struct
   let set_closure env dst func_id vars =
     set_env dst (func_val func_id vars) env
 
+  let set_closure' env dst func_id vars =
+    set_env dst (func_val' func_id vars) env
+
   let prepare_call env closure param =
-    { env with prepared_call = Some {closure = Ids.singleton closure;
-                                     param = Ids.singleton param} }
+    { env with prepared_call = Some {closure = Locs.singleton closure;
+                                     param = Locs.singleton param} }
+
+  let prepare_call' env closure param =
+    { env with prepared_call = Some { closure; param } }
 
   let bottom = env_v Envs.bottom
   let empty = env_v Envs.empty
@@ -121,13 +167,13 @@ module Env = struct
       | Some p, None
       | None, Some p -> Some p
       | Some p1, Some p2 ->
-        Some { closure = Data.Ids.union p1.closure p2.closure;
-               param = Data.Ids.union p1.param p2.param } in
+        Some { closure = Locs.union p1.closure p2.closure;
+               param = Locs.union p1.param p2.param } in
     { env = (Envs.join e1.env e2.env);
       prepared_call }
 
   let is_bottom_env e = Envs.is_bottom e.env
-  let is_leq e1 e2 = Envs.is_leq e1.env e2.env
+  let is_leq e1 e2 = Manipulation.is_leq e1.env e2.env
 
   let call abs =
     match abs.env with
@@ -136,19 +182,42 @@ module Env = struct
       match abs.prepared_call with
       | None -> failwith "malformed call sequence"
       | Some { closure; param } ->
-        let f = (get_union closure abs.env).f in
-        let functions = List.map fst (Fm.bindings f) in
+        let functions = get_union_fids closure abs in
         [|bottom|], functions
+
+  let merge_tabs a b = match a,b with
+    | [||], x | x, [||] -> x
+    | _,_ -> Array.init (Array.length a) (fun i -> Locs.union a.(i) b.(i))
 
   let enforce_closure abs func_id =
     match abs.prepared_call with
     | None -> failwith "malformed call sequence"
     | Some { closure; param } ->
-      let f = (get_union closure abs.env).f in
-      let used_closure = Fm.find func_id f in
-      let closure_val = func_val' func_id used_closure in
-      let abs = Ids.fold (fun id acc -> set_data id closure_val acc) closure abs in
-      abs, used_closure
+      let env, c =
+        Access.fold_locs
+          (fun loc { f } ( (env,tab) as acc) ->
+             try 
+               let used_closure = Fm.find func_id f in
+               let closure_val = func_val' func_id used_closure in
+               let env2 = Access.set_data loc closure_val abs.env in
+               (Envs.join env2 env, merge_tabs tab used_closure)
+             with Not_found -> acc
+          ) closure ( Envs.bottom, [||]) abs.env in
+      { abs with env }, c
+      (* let f = (get_union closure abs.env).f in *)
+      (* if (Fm.is_empty f) *)
+      (* then ( *)
+      (*   let pp = Format.std_formatter in *)
+      (*   Format.pp_print_newline pp (); *)
+      (*   Locs.print pp closure; *)
+      (*   Format.pp_print_newline pp (); *)
+      (*   Print_data.print_until_done pp closure Locs.empty abs.env; *)
+      (*        () *)
+      (*      ); *)
+      (* let used_closure = Fm.find func_id f in (\* RAISE NOT_FOUND on top AIdo *\) *)
+      (* let closure_val = func_val' func_id used_closure in *)
+      (* let abs = Locs.fold (fun id acc -> set_data id closure_val acc) closure abs in *)
+      (* abs, used_closure *)
 
   let access_closure abs dst func_id pos =
     match abs.env with
@@ -158,7 +227,7 @@ module Env = struct
       | None -> failwith "malformed call sequence"
       | Some { closure; param } as prepared_call ->
         let abs, used_closure = enforce_closure abs func_id in
-        { (set_env dst (get_union used_closure.(pos) abs.env) abs) with
+        { env = Access.set_idents dst used_closure.(pos) abs.env;
           prepared_call }
 
   let access_param abs dst =
@@ -168,172 +237,20 @@ module Env = struct
       match abs.prepared_call with
       | None -> failwith "malformed call sequence"
       | Some { closure; param } as prepared_call ->
-        { (set_env dst (get_union param abs.env) abs) with
+        { env = Access.set_idents dst param abs.env;
           prepared_call }
 
 end
 
-let g = H.create ()
+type h = (unit,hedge_attr,unit) H.graph
 
-let tid s = ( "", ( Id.create ~name:s () ) )
+let bigraphtbl : ( string, h * Vertex.t * h * H.subgraph ) Hashtbl.t = Hashtbl.create 16
+let get_bigraph s = Hashtbl.find bigraphtbl s
+let register_bigraph s q = Hashtbl.add bigraphtbl s q
 
-let a_id = tid "a"
-let b_id = tid "b"
-let c_id = tid "c"
-let f_id = tid "f"
-let closure_id = tid "f"
+let tid s = TId.create ~name:s ()
 
-let n_cst = 1
-let m_cst = 42
-
-let func = F.create ~name:"func" ()
-
-let v0 = "v0"
-let v1 = "v1"
-let v2 = "v2"
-let v3 = "v3"
-let v4 = "v4"
-let v5 = "v5"
-
-let () =
-  let vert = [v0;v1;v2;v3;v4;v5] in
-  List.iter (fun v -> H.add_vertex g v ()) vert;
-  H.add_hedge g "0.1" (Set_int (a_id,n_cst)) ~pred:[|v0|] ~succ:[|v1|];
-  H.add_hedge g "1.2" (Set_int (b_id,m_cst)) ~pred:[|v1|] ~succ:[|v2|];
-  H.add_hedge g "2.3" (Set_closure (f_id, func, [|a_id|])) ~pred:[|v2|] ~succ:[|v3|];
-  H.add_hedge g "3.4" (Prepare_call (f_id, b_id)) ~pred:[|v3|] ~succ:[|v4|];
-  H.add_hedge g "4.5" Call ~pred:[|v4|] ~succ:[|v5|]
-
-
-let g_func = H.create ()
-
-let v_in = "v.in"
-let v7 = "v7"
-let v8 = "v8"
-let v9 = "v9"
-let v10 = "v10"
-let v11 = "v11"
-let v12 = "v12"
-let v_out = "v.out"
-
-let () =
-  let vert = [v_in; v_out; v7; v8; v9; v10; v11; v12] in
-  List.iter (fun v -> H.add_vertex g_func v ()) vert;
-  H.add_hedge g_func "6.7" (Access_closure (a_id, func, 0)) ~pred:[|v_in|] ~succ:[|v7|];
-  H.add_hedge g_func "7.8" (Access_param b_id) ~pred:[|v7|] ~succ:[|v8|];
-  H.add_hedge g_func "8.9" (Add_int (a_id, b_id, c_id)) ~pred:[|v8|] ~succ:[|v9|];
-
-  H.add_hedge g_func "9.10" (Set_closure (f_id, func, [|b_id|])) ~pred:[|v9|] ~succ:[|v10|];
-  H.add_hedge g_func "10.11" (Prepare_call (f_id, c_id)) ~pred:[|v10|] ~succ:[|v11|];
-
-  H.add_hedge g_func "11.12" Call ~pred:[|v11|] ~succ:[|v12|];
-
-  H.add_hedge g_func "12.13" (Add_int (c_id, b_id, c_id)) ~pred:[|v12|] ~succ:[|v_out|];
-  H.add_hedge g_func "9.12" (Set_int (c_id,m_cst)) ~pred:[|v9|] ~succ:[|v_out|]
 
 let vset_list l = List.fold_right H.VertexSet.add l H.VertexSet.empty
 let hset_list l = List.fold_right H.HedgeSet.add l H.HedgeSet.empty
 
-let func_subgraph =
-  { H.sg_input = [|v_in|];
-    H.sg_output = [|v_out|];
-    H.sg_vertex = vset_list [v7;v8;v9;v10;v11;v12];
-    H.sg_hedge = hset_list ["6.7";"7.8";"8.9";"9.10";"10.11";"11.12";"12.13";"9.12"] }
-
-module Manager = struct
-  module H = H
-  type abstract = Env.t
-
-  type vertex_attribute = unit
-  type hedge_attribute = hedge_attr
-  type graph_attribute = unit
-
-  let apply hedge attr tabs =
-    let abs = tabs.(0) in
-    let geti x = Env.get_ident x abs in
-    Printf.eprintf "%s %s\n%!" hedge (hedge_attr_to_string attr);
-    match attr with
-    | Set_int (id,cst) ->
-      [|Env.set_int abs id cst|], [] (* id <- cst *)
-    | Set_closure (fun_id, funct, id_arr ) ->
-      [|Env.set_closure abs fun_id funct (Array.map geti id_arr)|], [] (* f <- closure{a} *)
-    | Prepare_call (fun_id, clos_id) ->
-      [|Env.prepare_call abs (geti fun_id) (geti clos_id)|], [] (* prepare call f b *)
-    | Call ->
-      Env.call abs
-    | Access_closure(id, funct, n) ->
-      [|Env.access_closure abs id funct n|], [] (* a <- closure.(0) *)
-    | Access_param(id) ->
-      [|Env.access_param abs id|], [] (* b <- param *)
-    | Add_int (id1,id2,id3) ->
-      [|Env.add_int abs id1 id2 id3|], [] (* c <- a + b *)
-    | Ignore -> [|abs|], []
-
-  let abstract_init i =
-    if i = "v0"
-    then Env.empty
-    else Env.bottom
-
-  let bottom _ = Env.bottom
-  let is_bottom _ = Env.is_bottom_env
-  let join_list _ l =
-    List.fold_left Env.join Env.bottom l
-
-  let widening _ a1 a2 = Env.join a1 a2
-  let narrowing = None
-
-  let is_leq _ = Env.is_leq
-
-  type function_id = F.t
-  module Function_id = F
-
-  let find_function id =
-    assert(F.equal id func);
-    g_func, func_subgraph
-
-  module Function_id' = struct
-    include Function_id
-    let is_important _ = true
-    let n = 3
-  end
-
-  module Stack = Abstract_stack.Leveled ( Function_id' )
-
-end
-
-let print_env ppf attr =
-  let open Format in
-  let open Env in
-  match attr.env with
-  | Bottom -> fprintf ppf "Bottom"
-  | Env env ->
-    fprintf ppf "{@[ ";
-    pp_print_string ppf "No env printer available";
-    (* Idm.iter (fun (_,id) _ -> fprintf ppf "%a " Id.print id) env; *)
-    fprintf ppf "@]}"
-
-let print_attrvertex ppf vertex attr =
-  Format.fprintf ppf "%s %a" vertex print_env attr.Fixpoint.v_abstract
-
-let ouput_dot g =
-  H.print_dot
-    ~print_attrvertex
-    (* ~print_attrhedge *)
-    Format.std_formatter g
-
-module FP = Fixpoint.Fixpoint(T)(Manager)
-(* let err_graph = ref None *)
-let r, map =
-  try FP.kleene_fixpoint (* ~err_graph *) g (Manager.H.VertexSet.singleton v0)
-  with e ->
-    (* (match !err_graph with *)
-    (*  | None -> assert false *)
-    (*  | Some g -> *)
-    (*    let print_attrvertex ppf vertex attr = Format.pp_print_string ppf vertex in *)
-    (*    H.print_dot *)
-    (*      ~print_attrvertex *)
-    (*      (\* ~print_attrhedge *\) *)
-    (*      Format.std_formatter g); *)
-    raise e
-
-let () = ouput_dot r

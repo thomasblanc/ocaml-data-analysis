@@ -86,7 +86,7 @@ let is_int env d =
     else Ints.add 1 res
   in
   let res =
-    if is_bottom env { d with int = bottom.int; cp = bottom.cp; }
+    if is_bottom { d with int = bottom.int; cp = bottom.cp; }
     then res
     else Ints.add 0 res
   in

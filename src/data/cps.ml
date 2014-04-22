@@ -15,7 +15,7 @@ let has v d = Ints.mem v d.cp || Int_interv.mem v d.int
 let is_one d env =
   let d = Int.import_cp d in
   (Int_interv.unique d.int) &&
-  is_bottom env { d with int = bottom.int }
+  is_bottom { d with int = bottom.int }
   
 
 let restrict ?v d =

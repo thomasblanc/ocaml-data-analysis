@@ -12,8 +12,14 @@ end
 
 begin test "tdata"
  test_byte = false
- files = [ "test_data.ml" ]
+ files = [ "test_data.ml"
+           "bigraphs/bgints.ml" (* put here bigraph definitions *)
+	   "test_data_launch" ]
  requires = [ "common" "hgraph" "data" ]
+ tests =
+ [
+  "bgints" ( test_args = [ "bgints" ] )
+ ]
 end
 
 begin test "thgraph"
@@ -104,6 +110,7 @@ begin test "tmain"
   "loop_no_rec" ( test_args = [ "-counter" "-dtlambda" "loop_no_rec.ml" "-dot" "loop_no_rec" ] test_exit = 1 )
   "functions" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "functions.ml" "-dot" "functions" ] )
   "semantics" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "semantics.ml" "-dot" "semantics" ] )
+  "option" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "option.ml" "-dot" "option" ] test_exit = 1 )
  ]
 
 end

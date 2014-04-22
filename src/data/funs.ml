@@ -1,15 +1,8 @@
+open Locations
 open Data
 
-let field i f env =
-  let l = Fm.fold (fun _ a l -> a.(i)::l) f.f [] in
-  match l with
-  | [x] when Ids.cardinal x = 1 -> get_data ( Ids.choose x ) env
-  | _ ->
-    List.fold_left (fun data ids ->
-        Ids.fold
-          (fun i data -> union data ( get_data i env ))
-          ids data
-      ) bottom  l
+let field i f =
+  Fm.fold (fun _ a locs -> Locs.union a.(i) locs) f.f Locs.empty
 
 let has_fid i fu = Fm.mem i fu.f
 
@@ -21,10 +14,10 @@ let mk i l =
   { bottom with
     f = Fm.singleton i
         ( Array.map
-            Ids.singleton
+            Locs.singleton
             ( Array.of_list l )
         );
   }
 
-let extract_ids { f; _ } = 
-  Fm.fold (fun k _ l -> k::l) f []
+let extract_ids { f; _ } acc =
+  Fm.fold (fun k _ l -> k::l) f acc

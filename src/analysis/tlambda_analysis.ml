@@ -4,6 +4,7 @@ open Tlambda
 open Tlambda_to_hgraph
 module G = G
 
+open Locations
 open Data
 
 type v = Vertex.t
@@ -47,14 +48,24 @@ let list_of_one f = function
 
 let warn ~env msg = print_endline msg; env
 
-let rec constraint_env_bool_var id b env =
-  constraint_env_bool_id (get_ident id env) b env
+let on_each_loc locs f env =
+  Locs.fold (fun loc acc -> Envs.join acc (f loc env)) locs Envs.bottom
 
-and constraint_env_bool_id i b env =
+let on_tid tid f env =
+  on_each_loc (get_idents tid env) f env
+
+let rec constraint_env_bool_var id b env =
+  on_tid id (constraint_env_bool_id b) env
+
+and constraint_env_bool_id b i env =
   let d = get_data i env in
   let es = d.expr in
   if Hinfos.is_empty es
-  then Envs.bottom
+  then (
+    let env, id = reg_ident i env in
+    Format.printf "No expr for %a@."
+          (fun pp id ->Print_data.print pp id env) id;
+    Envs.bottom)
   else
     let general g f =
       if g env d
@@ -74,10 +85,11 @@ and constraint_env_bool_exprs es bool env =
 
 and constraint_env_bool expr bool env =
   let cp = if bool then 1 else 0 in
-  let get i = get_env i env in
+  (* let get i = get_env i env in *)
   let getd i = get_data i env in
   let setd i x = set_data i x env in
   let geti i = get_ident i env in
+  let getis i = get_idents i env in
   match expr with
   | Var x -> constraint_env_bool_var x bool env
   | Prim ( p, l ) ->
@@ -86,25 +98,35 @@ and constraint_env_bool expr bool env =
       | TPintcomp c, [x;y]  ->
         let c = may_rev_comp c cp in
         let ix = geti x and iy = geti y in
-        let x' = getd ix and y' = getd iy in
-        let (x',y') = Int.make_comp c x' y' in
-        setd ix x'
-        |> set_data iy y'
+        (match ix,iy with
+        | Some ix, Some iy ->
+          let x' = getd ix and y' = getd iy in
+          let (x',y') = Int.make_comp c x' y' in
+          setd ix x'
+          |> set_data iy y'
+        | _,_ -> env)
       | TPsetfield _, _::_::[]
       | TPsetfloatfield _, _::_::[]
         when not bool -> env
       | TPfield i, [b] ->
-        let ids = Blocks.get_field i (get b) in
-        Ids.fold
-          (fun i acc ->
-             Envs.join acc
-               ( constraint_env_bool_id i bool env)
-          ) ids Envs.bottom
+        let ibs = getis b in
+        Locs.fold
+          (fun loc acc ->
+             let locs = Blocks.get_field i (getd loc) in
+             Locs.fold
+               (fun loc acc ->
+                  Envs.join acc
+                    ( constraint_env_bool_id bool loc env)
+               ) locs acc
+          ) ibs Envs.bottom
       | TPnot, [x] ->
         constraint_env_bool_var x (not bool) env
       | TPisint, [x] when bool ->
-        let ix = geti x in
-        setd ix ( Int.restrict_intcp (getd ix) )
+        let ixs = getis x in
+        Locs.fold (fun loc acc ->
+            Envs.join acc
+              (setd loc ( Int.restrict_intcp (getd loc) ))
+          ) ixs Envs.bottom
       | TPisint, [x] ->
         let ix = geti x in
         setd ix ( Int.restrict_not_intcp (getd ix) )
@@ -435,16 +457,16 @@ end
             (* Operations on heap blocks *)
             | TPfield i, [b] ->
               let ib = geti b in
-              let env =
-                setd ib ( Blocks.restrict ~has_field:i ( get_data ib env)) in
-              let ids = Blocks.get_field i ( get_data ib env) in
-              set_env id
-                ( act
+              let db = getd ib in
+              let db = ( Blocks.restrict ~has_field:i db) in
+              let ids = Blocks.get_field i db in
+              set
+                ( Exprs.add 
                     ( Ids.fold
-                        (fun i d -> union (get_data i env) d )
+                        (fun i d -> union (getd i) d )
                         ids Data.bottom )
-                )
-                env
+                    action )
+            |> set_data ib db
             | TPsetfield ( i, _ ), [b;v] ->
               let ib = geti b in
               setd ib ( Blocks.set_field i (geti v) (getd ib) )
@@ -629,19 +651,18 @@ end
         List.fold_left
           (fun env -> function
              | i, ( Alloc (p,l) as action ) ->
-               let act d = Exprs.set d action in
                let l = List.map (fun id -> get_ident id env) l in
-               begin
-                 match p with
-                 | TPfun fid -> set_data i ( act ( Funs.mk fid l ) ) env
-                 | TPmakearray k ->
-                   set_data i
-                     ( act ( Arrays.singleton l ( Int_interv.cst (List.length l)) k ) )
-                     env
-                 | TPmakeblock ( tag, _) ->
-                   let a = Array.of_list l in
-                   set_data i ( act ( Blocks.singleton tag a ) ) env
-               end
+               set_data i
+                 ( Exprs.set
+                     begin
+                       match p with
+                       | TPfun fid -> Funs.mk fid l
+                       | TPmakearray k ->
+                         Arrays.singleton l ( Int_interv.cst (List.length l)) k
+                       | TPmakeblock ( tag, _) ->
+                         let a = Array.of_list l in
+                         Blocks.singleton tag a
+                     end action ) env
              | _, _ -> assert false
           ) env l
       in

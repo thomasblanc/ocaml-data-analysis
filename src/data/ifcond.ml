@@ -1,4 +1,5 @@
 open Data
+open Manipulation
 
 let set_true d =
   { d with
@@ -9,13 +10,15 @@ let set_true d =
   }
 
 let can_be_true env d =
-  not ( is_bottom env (set_true d) )
+  not ( is_bottom (set_true d) )
 
 let set_false d =
   let dfalse =
     { bottom with
       int = Int_interv.cst 0;
-      cp = Ints.singleton 0; } in
+      cp = Ints.singleton 0;
+      expr = d.expr;
+    } in
   if d.top
   then dfalse
   else { bottom with

@@ -1,4 +1,5 @@
 open Common_types
+open Locations
 open Data
 
 let singleton l size akind =
@@ -7,7 +8,7 @@ let singleton l size akind =
     bottom with
     arrays =
       {
-        a_elems = List.fold_left (fun e i -> Ids.add i e) Ids.empty l;
+        a_elems = List.fold_left (fun e i -> Locs.add i e) Locs.empty l;
         a_size = size;
         a_gen = akind = Pgenarray;
         a_float = akind = Pfloatarray;
@@ -24,7 +25,7 @@ let add_field x i =
   { x with
     arrays =
       { x.arrays with
-        a_elems = Ids.add i x.arrays.a_elems
+        a_elems = Locs.add i x.arrays.a_elems
       }
   }
 
@@ -36,6 +37,6 @@ let set x id =
   { x with
     arrays =
       { x.arrays with
-        a_elems = Ids.add id x.arrays.a_elems;
+        a_elems = Locs.add id x.arrays.a_elems;
       }
   }

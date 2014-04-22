@@ -1,5 +1,19 @@
 open Common_types
+open Locations
 open Data
+
+type 'a locm = 'a Locm.t
+
+(* The environment *)
+type environment =
+  | Bottom
+  | Env of env_descr
+and env_descr = 
+  {
+    entries: locs TIdm.t;
+    values : Data.t locm;
+  }
+
 
 (* Environment management *)
 
@@ -8,38 +22,34 @@ let is_bottom = function
   | _ -> false
 
 let bottom = Bottom
-let empty = Env { entries = TIdm.empty; values = Idm.empty }
+let empty =
+  Env {
+    entries = TIdm.empty;
+    values = Locm.empty;
+  }
+
+let no_bottom str f = function
+  | Bottom -> Format.eprintf "Bottom error on %s@." str; assert false
+  | Env e -> f e
 
 (* Joining and widening helper *)
 
-let join_or_widen (union:data -> data -> data) e1 e2 =
+let merger_rec f _ x y =
+  match x, y with
+  | None, a| a, None -> a
+  | Some a, Some b -> Some (f a b)
+
+let merger_locs = merger_rec Locs.union
+
+let merger_simple x y = merger_rec (fun a b -> assert (a=b); a) x y
+
+let join_or_widen (union: Data.t -> Data.t -> Data.t) e1 e2 =
   match e1, e2 with
   | Bottom, e | e, Bottom -> e
   | Env d1, Env d2 ->
-    let to_merge = ref [] in
-    let entries =
-      TIdm.merge (fun id i1 i2 ->
-          match i1, i2 with
-          | None, i | i, None -> i
-          | Some i1, Some i2 ->
-            if i1 <> i2 then to_merge := (i1,i2) :: !to_merge;
-            Some i2
-        ) d1.entries d2.entries in
-    let values1 =
-      List.fold_left (fun values (i1,i2) ->
-          if Idm.mem i2 values
-          then Idm.add i2 (union (Idm.find i1 values) (Idm.find i2 values)) values
-          else Idm.add i2 (Idm.find i1 values) values
-        ) d1.values !to_merge in
-    let values = Idm.merge
-        ( fun _ v1 v2 ->
-           match v1, v2 with
-           | None, v | v, None -> v
-           | Some v1, Some v2 ->
-             Some (union v1 v2)
-        ) values1 d2.values
-    in
-    Env { entries; values }
+    let entries = TIdm.merge merger_locs d1.entries d2.entries in
+    let values = Locm.merge (merger_rec union) d1.values d2.values in
+    Env { values; entries }
 
 
 (* Environment joining *)
@@ -48,27 +58,8 @@ let join e1 e2 = join_or_widen union e1 e2
 
 (* Environment joining with widening *)
 
-let widening e1 e2 =
-  let renvres = ref empty in
-  let widening = widening e1 e2 renvres in
-  join_or_widen widening e1 e2
+let widening e1 e2 = join_or_widen widening e1 e2
 
-(* Environment comparison *)
-
-let is_leq e1 e2 =
-  match e1, e2 with
-  | Bottom, _ -> true
-  | _, Bottom -> false
-  | Env e1, Env e2 ->
-    TIdm.for_all
-      (fun id i ->
-         try
-           is_leq
-             (Idm.find i e1.values)
-             ( Idm.find (TIdm.find id e2.entries) e2.values)
-         with
-           Not_found -> false )
-      e1.entries
 
 
 

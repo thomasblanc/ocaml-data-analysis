@@ -1,0 +1,195 @@
+open Common_types
+open Constants
+open Locations
+open Data
+open Envs
+
+
+
+(* Inclusion test *)
+
+let included_simple a b = match a, b with
+  | Top, _ | _, Top -> true
+  | Constants s, Constants s' -> Constants.exists ( fun a -> Constants.mem a s') s
+
+let array2_forall f a b =
+  let l = Array.length a in
+  let rec aux i = i = l || f a.(i) b.(i) || aux (succ i) in
+  aux 0
+
+(* let rec included env i1 i2 = *)
+(*   let a = get_data i1 env *)
+(*   and b = get_data i2 env in *)
+(*   if is_bottom env b *)
+(*   then is_bottom env a *)
+(*   else  *)
+(*     b.top *)
+(*     || a.top *)
+(*     || Int_interv.is_leq a.int b.int *)
+(*     || included_simple a.float b.float *)
+(*     || included_simple a.string b.string *)
+(*     || included_simple a.i32 b.i32 *)
+(*     || included_simple a.i64 b.i64 *)
+(*     || included_simple a.inat b.inat *)
+(*     || Ints.exists (fun a -> Ints.mem a b.cp) a.cp *)
+(*     || Tagm.exists *)
+(*       (fun k a -> *)
+(*          try *)
+(*            let b = Tagm.find k b.blocks in *)
+(*            Intm.exists *)
+(*              (fun k a -> *)
+(*                 let b = Intm.find k b in *)
+(*                 array2_forall *)
+(*                   (fun a b -> *)
+(*                      Locs.exists *)
+(*                        (fun a -> Locs.exists ( included env a) b) *)
+(*                        a *)
+(*                   ) *)
+(*                   a b *)
+(*              ) a *)
+(*          with Not_found -> false) a.blocks *)
+(*     || ( Int_interv.is_leq a.arrays.a_size b.arrays.a_size && true (\* TODO: the idsets and the atypes*\) ) *)
+(*     || Fm.exists *)
+(*       (fun k a -> *)
+(*          try *)
+(*            let b = Fm.find k b.f in *)
+(*            array2_forall *)
+(*              (fun a b -> *)
+(*                 Locs.exists *)
+(*                   (fun a -> Locs.exists ( included env a) b) *)
+(*                   a *)
+(*              ) a b *)
+(*          with Not_found -> false) a.f *)
+
+(* Leq test *)
+
+let leq_simple a b =
+  match a, b with
+  | _, Top -> true
+  | Top, _ -> false
+  | Constants a, Constants b -> Constants.subset a b
+
+(* Intersection *)
+
+let intersection_simple a b = match a, b with
+  | Top, a | a, Top -> a
+  | Constants s, Constants s' ->
+    Constants ( Constants.inter s s')
+
+let mi f _ a b = match a,b with
+  | _, None | None, _ -> None
+  | Some a, Some b -> Some (f a b)
+
+let intersect_noncommut a b =
+  (* keeps the ids in a that are possibly compatible with b *)
+  if a.top then b
+  else if b.top then a
+  else
+    let blocks = 
+      Tagm.merge
+        (mi
+           (fun is1 is2 ->
+              Intm.merge
+                (mi (fun s1 _ -> s1 ) ) is1 is2
+           ) ) a.blocks b.blocks
+    in
+    let f =
+      Fm.merge
+        (mi
+          (fun a _ -> a
+            (* Array.mapi *)
+            (*       (fun i a -> *)
+            (*          Locs.filter *)
+            (*            (fun a -> *)
+            (*               Locs.exists (included env a) b.(i) *)
+            (*            ) a *)
+            (*       ) a *)
+          ) ) a.f b.f
+    in
+    { top = false;
+      int = Int_interv.meet a.int b.int;
+      float = intersection_simple a.float b.float;
+      string = intersection_simple a.string b.string;
+      i32 = intersection_simple a.i32 b.i32;
+      i64 = intersection_simple a.i64 b.i64;
+      inat = intersection_simple a.inat b.inat;
+      cp = Ints.inter a.cp b.cp;
+      blocks;
+      arrays =
+        {
+          a_elems = a.arrays.a_elems (* TODO: see that again *);
+          a_size = Int_interv.meet a.arrays.a_size b.arrays.a_size;
+          a_gen = a.arrays.a_gen && b.arrays.a_gen;
+          a_float = a.arrays.a_float && b.arrays.a_float;
+          a_addr = a.arrays.a_addr && b.arrays.a_addr;
+          a_int = a.arrays.a_int && b.arrays.a_int;
+        };
+      f;
+      expr = Hinfos.empty;
+    }
+
+(* Environment comparison *)
+
+let merge_loc loc e = Locm.fold_key (fun _ -> Data.union) loc e.values Data.bottom
+
+(* boolean leq *)
+let lb a b = b || not a
+
+let rec is_leq e1 e2 =
+  match e1, e2 with
+  | Bottom, _ -> true
+  | _, Bottom -> false
+  | Env e1, Env e2 ->
+    try is_leq_env e1 e2
+    with Not_found -> false
+
+and is_leq_env e1 e2 =
+  TIdm.for_all
+    (fun tid locs ->
+       let locs2 = TIdm.find tid e2.entries in
+       is_leq_locs e1 e2 locs locs2
+    ) e1.entries
+
+and is_leq_locs e1 e2 l1 l2 =
+  Locs.subset l1 l2 &&
+  Locs.for_all
+    (fun loc ->
+       let d1 = merge_loc loc e1 in
+       let d2 = merge_loc (Locs.find loc l2) e2 in
+       is_leq_data e1 e2 d1 d2 ) l1
+
+and is_leq_data e1 e2 a b =
+  b.top
+  || not a.top
+     && Int_interv.is_leq a.int b.int
+     && leq_simple a.float b.float
+     && leq_simple a.string b.string
+     && leq_simple a.i32 b.i32
+     && leq_simple a.i64 b.i64
+     && leq_simple a.inat b.inat
+     && Ints.subset a.cp b.cp
+     && Tagm.for_all
+       (fun k a ->
+          let b = Tagm.find k b.blocks in
+           Intm.for_all
+             (fun k a ->
+                let b = Intm.find k b in
+                array2_forall (is_leq_locs e1 e2) a b
+             ) a
+      ) a.blocks
+     && is_leq_locs e1 e2 a.arrays.a_elems b.arrays.a_elems
+     && Int_interv.is_leq a.arrays.a_size b.arrays.a_size
+     && ( b.arrays.a_gen
+          || not a.arrays.a_gen
+             && lb a.arrays.a_float b.arrays.a_float
+             && lb a.arrays.a_addr b.arrays.a_addr
+             && lb a.arrays.a_int b.arrays.a_int
+       )
+     && Fm.for_all
+       (fun k a ->
+            let b = Fm.find k b.f in
+            array2_forall (is_leq_locs e1 e2) a b
+       ) a.f
+
+
+
