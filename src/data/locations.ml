@@ -69,7 +69,7 @@ end
 type atpl = AIdo.t * ap
 (* the allocation tuple *)
 
-let make_atpl tid = (AIdo.create (), tid)
+let of_tid tid = (AIdo.create (), tid)
 let print_atpl pp (aido,tid) = Format.fprintf pp "(%a,%a)" AIdo.print aido TId.print tid
 
 module AIdm = Map.Make(AId)
@@ -199,6 +199,7 @@ end
 module Locm : sig
   include Map.S with type key = atpl
   val fold_key : ( key -> 'a -> 'b -> 'b) -> key -> 'a t -> 'b -> 'b
+  val fold_by_loc : (key -> 'b -> 'b) -> 'a t -> 'b -> 'b
 end = struct
 
   type key = atpl
@@ -313,6 +314,11 @@ end = struct
   let print f pp m = TIdm.print (AIdm.print f) pp m
   let print_sep fsep f pp s =
     TIdm.print_sep fsep (AIdm.print_sep fsep f) pp s
+
+  let fold_by_loc f m acc =
+    TIdm.fold (fun tid _ acc ->
+        f (AIdo.any,tid) acc
+      ) m acc
 
 end
 

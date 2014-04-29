@@ -50,6 +50,7 @@ struct
   let create ?(name="") () =
     decr idref;
     ( "", { stamp = !idref; name = ( "$$" ^ name ); flags = 0; } )
+  let dual (s,i) = ("_"^s,i)
 end
 
 let fun_tid = TId.create ()
@@ -169,3 +170,5 @@ type hinfo =
   | Ccall of Primitive.description * tid list
   | Send of tid * tid
 and constr = Ccp of int | Ctag of int | Cbool of bool
+
+let ppf = Format.std_formatter

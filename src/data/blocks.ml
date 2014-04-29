@@ -13,7 +13,7 @@ let singleton tag content =
       Tagm.singleton tag
         ( Intm.singleton
             ( Array.length content)
-            ( Array.map Locs.singleton content)
+            content
         )
   }
 
@@ -59,17 +59,18 @@ let fieldn_map f n b =
   }
 
 let has_tag t d = Tagm.mem t d.blocks
-let is_one_tag d env =
+let is_one_tag d =
   Tagm.cardinal d.blocks = 1 &&
   is_bottom { d with blocks = bottom.blocks }
 
-
-let set_field i v b =
+let sets_field i locs b =
   let b = restrict ~has_field:i b in
   { bottom with
-    blocks = Tagm.map ( Intm.map ( set_a i (Locs.singleton v))) b.blocks;
+    blocks = Tagm.map ( Intm.map ( set_a i locs)) b.blocks;
     expr = b.expr;
   }
+
+let set_field i v b = sets_field i (Locs.singleton v) b
 
 
 let get_field i b =
@@ -91,3 +92,16 @@ let make_basic tag size arr =
   { bottom with
     blocks = Tagm.singleton tag ( Intm.singleton size arr )
   }
+
+let fold_field f i b acc env =
+  Tagm.fold
+    (fun _ b acc ->
+       Intm.fold
+         (fun s a acc ->
+            if s > i
+            then Access.fold__locs f a.(i) acc env
+            else acc) b acc
+    ) b.blocks acc
+
+let on_field f i b env =
+  fold_field (Access.fold_to_on f env) i b Access.on_first_acc env

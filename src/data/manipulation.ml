@@ -135,20 +135,14 @@ let merge_loc loc e = Locm.fold_key (fun _ -> Data.union) loc e.values Data.bott
 (* boolean leq *)
 let lb a b = b || not a
 
-(* total location set *)
-
-module Atpls = Utils.Set.Make (
-  struct
-    type t = atpl
-    let compare = Pervasives.compare
-    let print = print_atpl
-  end)
 
 let rec is_leq e1 e2 =
   match e1, e2 with
   | Bottom, _ -> true
   | _, Bottom -> false
-  | Env e1, Env e2 ->
+  | Env e1, Env e2 -> is_leq' e1 e2
+
+and is_leq' e1 e2 =
     try is_leq_env e1 e2
     with Not_found -> false
 
@@ -201,6 +195,4 @@ and is_leq_data e1 e2 visited a b =
             let b = Fm.find k b.f in
             array2_forall ill a b
        ) a.f
-
-
 

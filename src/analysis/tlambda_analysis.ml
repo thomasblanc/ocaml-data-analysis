@@ -6,10 +6,12 @@ module G = G
 
 open Locations
 open Data
+open Envs
+open Access
 
 type v = Vertex.t
 type h = Hedge.t
-type e = environment
+type e = Envs.t
 type ha = hattr
 
 let apply_counter = ref 0
@@ -46,241 +48,290 @@ let list_of_one f = function
    Using the results of a "if" or "match" statement to restrain the environment
 *)
 
-let warn ~env msg = print_endline msg; env
+let warn ~env msg = print_endline msg; Env env
 
-let on_each_loc locs f env =
-  Locs.fold (fun loc acc -> Envs.join acc (f loc env)) locs Envs.bottom
-
-let on_tid tid f env =
-  on_each_loc (get_idents tid env) f env
-
-let rec constraint_env_bool_var id b env =
-  on_tid id (constraint_env_bool_id b) env
-
-and constraint_env_bool_id b i env =
-  let d = get_data i env in
+let hfold f d env =
   let es = d.expr in
-  if Hinfos.is_empty es
-  then (
-    let env, id = reg_ident i env in
-    Format.printf "No expr for %a@."
-          (fun pp id ->Print_data.print pp id env) id;
-    Envs.bottom)
-  else
-    let general g f =
-      if g env d
-      then 
-        constraint_env_bool_exprs es b env
-        |> set_data i (f d)
-      else Envs.bottom
-    in
-    if b
-    then general Ifcond.can_be_true Ifcond.set_true
-    else general Ifcond.can_be_false Ifcond.set_false
+  if Hinfos.is_empty es (* should only happen inside constants *)
+  then !> env
+  else Hinfos.fold (fun expr e -> Envs.join ( f expr env ) e ) es Envs.bottom
 
-and constraint_env_bool_exprs es bool env =
-  Hinfos.fold
-    (fun expr e -> Envs.join e ( constraint_env_bool expr bool env ) )
-    es Envs.bottom
+let rec constraint_env_bool_var b tid (env:Envs.t') =
+  (* Format.fprintf ppf "Constraining@ %a@." TId.print tid; *)
+  on_tid (constraint_env_bool_folder b) tid env
 
-and constraint_env_bool expr bool env =
+and constraint_env_bool_folder b loc d (env:Envs.t') =
+  let general g f =
+    if g env d
+    then 
+      constraint_env_bool_exprs b d env
+      >! set_data loc (f d)
+    else Envs.bottom
+  in
+  if b
+  then general Ifcond.can_be_true Ifcond.set_true
+  else general Ifcond.can_be_false Ifcond.set_false
+
+and constraint_env_bool_locs b locs (env:Envs.t') =
+  on__locs (constraint_env_bool_folder b) locs env
+
+(* and constraint_env_bool_id b i env = *)
+(*   let d = get_data i env in *)
+(*   let es = d.expr in *)
+(*   if Hinfos.is_empty es *)
+(*   then ( *)
+(*     let env, id = reg_ident i env in *)
+(*     Format.printf "No expr for %a@." *)
+(*           (fun pp id ->Print_data.print pp id env) id; *)
+(*     Envs.bottom) *)
+(*   else *)
+(*     let general g f = *)
+(*       if g env d *)
+(*       then  *)
+(*         constraint_env_bool_exprs es b env *)
+(*         |> set_data i (f d) *)
+(*       else Envs.bottom *)
+(*     in *)
+(*     if b *)
+(*     then general Ifcond.can_be_true Ifcond.set_true *)
+(*     else general Ifcond.can_be_false Ifcond.set_false *)
+
+and constraint_env_bool_exprs bool d (env:Envs.t') =
+  hfold (constraint_env_bool bool) d env
+
+and constraint_env_bool bool expr (env:Envs.t') =
   let cp = if bool then 1 else 0 in
   (* let get i = get_env i env in *)
-  let getd i = get_data i env in
-  let setd i x = set_data i x env in
-  let geti i = get_ident i env in
-  let getis i = get_idents i env in
+  (* let getd i = get_data i env in *)
+  (* let setd i x = set_data i x env in *)
+  (* let geti i = get_ident i env in *)
+  (* let getis i = get_idents i env in *)
   match expr with
-  | Var x -> constraint_env_bool_var x bool env
+  | Var x -> constraint_env_bool_var bool x env
   | Prim ( p, l ) ->
     begin
       match p, l with
       | TPintcomp c, [x;y]  ->
         let c = may_rev_comp c cp in
-        let ix = geti x and iy = geti y in
-        (match ix,iy with
-        | Some ix, Some iy ->
-          let x' = getd ix and y' = getd iy in
-          let (x',y') = Int.make_comp c x' y' in
-          setd ix x'
-          |> set_data iy y'
-        | _,_ -> env)
+        on_tid (fun locx dx e ->
+            on_tid (fun locy dy e ->
+                let dx,dy = Int.make_comp c dx dy in
+                if Data.is_bottom dx || Data.is_bottom dy
+                then Envs.bottom
+                else
+                  set_data locx dx e
+                  >! set_data locy dy
+              ) y e
+          ) x env
       | TPsetfield _, _::_::[]
       | TPsetfloatfield _, _::_::[]
-        when not bool -> env
-      | TPfield i, [b] ->
-        let ibs = getis b in
-        Locs.fold
-          (fun loc acc ->
-             let locs = Blocks.get_field i (getd loc) in
-             Locs.fold
-               (fun loc acc ->
-                  Envs.join acc
-                    ( constraint_env_bool_id bool loc env)
-               ) locs acc
-          ) ibs Envs.bottom
+        when not bool -> Env env
+      | TPfield i, [b] -> Env env (* we cannot tell anything in case the block is mutable *)
+        (* let ibs = getis b in *)
+        (* Locs.fold *)
+        (*   (fun loc acc -> *)
+        (*      let locs = Blocks.get_field i (getd loc) in *)
+        (*      Locs.fold *)
+        (*        (fun loc acc -> *)
+        (*           Envs.join acc *)
+        (*             ( constraint_env_bool_id bool loc env) *)
+        (*        ) locs acc *)
+        (*   ) ibs Envs.bottom *)
       | TPnot, [x] ->
-        constraint_env_bool_var x (not bool) env
+        constraint_env_bool_var (not bool) x env
       | TPisint, [x] when bool ->
-        let ixs = getis x in
-        Locs.fold (fun loc acc ->
-            Envs.join acc
-              (setd loc ( Int.restrict_intcp (getd loc) ))
-          ) ixs Envs.bottom
+        on_tid (fun loc d e ->
+            set_data loc (Int.restrict_intcp d) e
+          ) x env
+        (* let ixs = getis x in *)
+        (* Locs.fold (fun loc acc -> *)
+        (*     Envs.join acc *)
+        (*       (setd loc ( Int.restrict_intcp (getd loc) )) *)
+        (*   ) ixs Envs.bottom *)
       | TPisint, [x] ->
-        let ix = geti x in
-        setd ix ( Int.restrict_not_intcp (getd ix) )
+        on_tid (fun loc d e ->
+            set_data loc (Int.restrict_not_intcp d) e)
+          x env
+        (* let ix = geti x in *)
+        (* setd ix ( Int.restrict_not_intcp (getd ix) ) *)
       | TPisout, [m;i] ->
-        let im = geti m and ii = geti i in
-        let dm, di = Int.make_is_out bool (getd im) (getd ii) in
-        setd im dm |> set_data ii di
+        on_tid (fun locm dm e ->
+            on_tid (fun loci di e ->
+                let dm, di = Int.make_is_out bool dm di in
+                set_data locm dm e
+              >! set_data loci di )
+              i e )
+          m env
+        (* let im = geti m and ii = geti i in *)
+        (* let dm, di = Int.make_is_out bool (getd im) (getd ii) in *)
+        (* setd im dm |> set_data ii di *)
       | TPbittest, [x] when bool -> warn ~env "TODO: bittest"
       | TPbittest, [x] -> warn ~env "TODO: bittest"
       | TPctconst Lambda.Word_size, [] -> Envs.bottom
-      | TPctconst _, [] -> env (* to correct ? *)
-      | _, _ -> env
+      | TPctconst _, [] -> Env env (* to correct ? *)
+      | _, _ -> Env env
     end
-  | _ -> env
+  | _ -> Env env
 
 
-let rec constraint_env_cp_var id cp env =
-  constraint_env_cp_id (get_ident id env) cp env
+let rec constraint_env_cp_var cp tid env =
+  on_tid (constraint_env_cp_folder cp) tid env
 
-and constraint_env_cp_id i cp env =
-  let d = get_data i env in
-  let es = d.expr in
-  if Hinfos.is_empty es
-  then Envs.bottom
-  else
-    let general () =
-      constraint_env_cp_exprs es cp env
-      |> set_data i (Cps.restrict ~v:cp d)
-    in
-    if Cps.has cp d
-    then
-      if Cps.is_one d env
-      then env
-      else general ()
-    else if Data.is_top d
-    then general ()
-    else Envs.bottom
+and constraint_env_cp_folder cp loc d env =
+  if Cps.has cp d
+  then
+    if Cps.is_one d
+    then Env env
+    else
+      hfold (constraint_env_cp cp) d env
+      >? set_data loc (Cps.restrict ~v:cp d)
+  else Envs.bottom
 
-and constraint_env_cp_exprs es cp env =
-  Hinfos.fold
-    (fun expr e -> Envs.join e ( constraint_env_cp expr cp env ) )
-    es Envs.bottom
+(* and constraint_env_cp_id cp i env = *)
+(*   let d = get_data i env in *)
+(*   let es = d.expr in *)
+(*   if Hinfos.is_empty es *)
+(*   then Envs.bottom *)
+(*   else *)
+(*     let general () = *)
+(*       constraint_env_cp_exprs cp d env *)
+(*       |> set_data i (Cps.restrict ~v:cp d) *)
+(*     in *)
+(*     if Cps.has cp d *)
+(*     then *)
+(*       if Cps.is_one d env *)
+(*       then env *)
+(*       else general () *)
+(*     else if Data.is_top d *)
+(*     then general () *)
+(*     else Envs.bottom *)
 
-and constraint_env_cp expr cp env =
+and constraint_env_cp_exprs cp d env =
+  hfold (constraint_env_cp cp) d env
+
+and constraint_env_cp cp expr env =
   assert(cp >= 0);
-  let get i = get_env i env in
-  let getd i = get_data i env in
-  let setd i x = set_data i x env in
-  let geti i = get_ident i env in
+  (* let get i = get_env i env in *)
+  (* let getd i = get_data i env in *)
+  (* let setd i x = set_data i x env in *)
+  (* let geti i = get_ident i env in *)
   (* let act x = Exprs.set x expr in *)
   match expr with
-  | Var x -> constraint_env_cp_var x cp env
+  | Var x -> constraint_env_cp_var cp x env
   | Prim ( p, l ) ->
     begin
       match p, l with
-      | TPintcomp c, [x;y]  ->
-        if cp > 1
-        then Envs.bottom
-        else
-          let c = may_rev_comp c cp in
-          let ix = geti x and iy = geti y in
-          let x' = getd ix and y' = getd iy in
-          let (x',y') = Int.make_comp c x' y' in
-          setd ix x'
-          |> set_data iy y'
+      (* | TPintcomp c, [x;y]  -> *)
+      (*   if cp > 1 *)
+      (*   then Envs.bottom *)
+      (*   else *)
+      (*     let c = may_rev_comp c cp in *)
+      (*     let ix = geti x and iy = geti y in *)
+      (*     let x' = getd ix and y' = getd iy in *)
+      (*     let (x',y') = Int.make_comp c x' y' in *)
+      (*     setd ix x' *)
+      (*     |> set_data iy y' *)
       | TPsetfield _, _::_::[]
       | TPsetfloatfield _, _::_::[]
-        when cp = 0 -> env
-      | TPfield i, [b] ->
-        let ids = Blocks.get_field i (get b) in
-        Ids.fold
-          (fun i acc ->
-             Envs.join acc
-               ( constraint_env_cp_id i cp env)
-          ) ids Envs.bottom
+        when cp = 0 -> Env env
+      | TPfield i, [b] -> Env env (* cannot say a thing because of mutables *)
+        (* let ids = Blocks.get_field i (get b) in *)
+        (* Ids.fold *)
+        (*   (fun i acc -> *)
+        (*      Envs.join acc *)
+        (*        ( constraint_env_cp_id i cp env) *)
+        (*   ) ids Envs.bottom *)
       | TPnot, [x] when cp < 2 ->
-        constraint_env_cp_var x (1-cp) env
-      | TPisint, [x] when cp = 0 ->
-        let ix = geti x in
-        setd ix ( Int.restrict_not_intcp (getd ix) )
-      | TPisint, [x] when cp = 1 ->
-        let ix = geti x in
-        setd ix ( Int.restrict_intcp (getd ix) )
-      | TPisout, [m;i] ->
-        if cp > 1
-        then Envs.bottom
-        else
-          let im = geti m and ii = geti i in
-          let dm, di = Int.make_is_out (cp = 1) (getd im) (getd ii) in
-          setd im dm |> set_data ii di
-      | TPbittest, [x] when cp = 0 -> warn ~env "TODO: bittest"
-      | TPbittest, [x] when cp = 1 -> warn ~env "TODO: bittest"
-      | TPctconst Lambda.Word_size, [] -> Envs.bottom
-      | TPctconst _, [] when cp < 2 -> env (* to correct ? *)
-      | TPoffsetint i, [x] ->
-        if cp - i >= 0
-        then constraint_env_cp_var x (cp-i) env
-        else Envs.bottom
+        constraint_env_cp_var (1-cp) x env
+      (* | TPisint, [x] when cp = 0 -> *)
+      (*   let ix = geti x in *)
+      (*   setd ix ( Int.restrict_not_intcp (getd ix) ) *)
+      (* | TPisint, [x] when cp = 1 -> *)
+      (*   let ix = geti x in *)
+      (*   setd ix ( Int.restrict_intcp (getd ix) ) *)
+      (* | TPisout, [m;i] -> *)
+      (*   if cp > 1 *)
+      (*   then Envs.bottom *)
+      (*   else *)
+      (*     let im = geti m and ii = geti i in *)
+      (*     let dm, di = Int.make_is_out (cp = 1) (getd im) (getd ii) in *)
+      (*     setd im dm |> set_data ii di *)
+      (* | TPbittest, [x] when cp = 0 -> warn ~env "TODO: bittest" *)
+      (* | TPbittest, [x] when cp = 1 -> warn ~env "TODO: bittest" *)
+      (* | TPctconst Lambda.Word_size, [] -> Envs.bottom *)
+      (* | TPctconst _, [] when cp < 2 -> env (\* to correct ? *\) *)
+      (* | TPoffsetint i, [x] -> *)
+      (*   if cp - i >= 0 *)
+      (*   then constraint_env_cp_var x (cp-i) env *)
+      (*   else Envs.bottom *)
       | _, _ -> assert false
     end
-  | _ -> env
+  | _ -> Env env
 
-let rec constraint_env_tag_var id tag env =
-  constraint_env_tag_id (get_ident id env) tag env
+let rec constraint_env_tag_var tag tid env =
+  on_tid (constraint_env_tag_folder tag) tid env
 
-and constraint_env_tag_id i tag env =
-  let d = get_data i env in
-  let l = d.expr in
+  (* constraint_env_tag_id (get_ident id env) tag env *)
+
+and constraint_env_tag_folder tag loc d env =
   if Blocks.has_tag tag d
-  then
-    if Blocks.is_one_tag d env
-    then env
-    else
-      begin
-        constraint_env_tag_exprs l tag env
-        |> set_data i (Blocks.restrict ~tag d)
-      end
+  then if Blocks.is_one_tag d
+    then Env env
+    else 
+      constraint_env_tag_exprs tag d env
+      >? set_data loc (Blocks.restrict ~tag d)
   else Envs.bottom
 
-and constraint_env_tag_exprs es tag env =
-  Hinfos.fold
-    (fun expr e -> Envs.join e ( constraint_env_tag expr tag env ) )
-    es Envs.bottom
+(* and constraint_env_tag_id  tag i env = *)
+(*   let d = get_data i env in *)
+(*   if Blocks.has_tag tag d *)
+(*   then *)
+(*     if Blocks.is_one_tag d env *)
+(*     then env *)
+(*     else *)
+(*       begin *)
+(*         constraint_env_tag_exprs tag d env *)
+(*         |> set_data i (Blocks.restrict ~tag d) *)
+(*       end *)
+(*   else Envs.bottom *)
 
-and constraint_env_tag expr tag env =
+and constraint_env_tag_exprs tag d env =
+  hfold (constraint_env_tag tag) d env
+  (* Hinfos.fold *)
+  (*   (fun expr e -> Envs.join e ( constraint_env_tag expr tag env ) ) *)
+  (*   es Envs.bottom *)
+
+and constraint_env_tag tag expr env =
   match expr with
-  | Var x -> constraint_env_tag_var x tag env
+  | Var x -> constraint_env_tag_var tag x env
   | Const _
   | App_prep ( _, _ )
   | Return _| Retexn _
   | Lazyforce _
   | Ccall (_, _)
-  | Send (_, _) -> env
+  | Send (_, _) -> Env env
   | App | App_return | App_exn -> assert false
   | Alloc ( p, l ) ->
     begin
       match p with
-      | TPmakeblock (t, _) when t = tag ->  env
+      | TPmakeblock (t, _) when t = tag -> Env env
       | _ -> Envs.bottom
     end
   | Prim ( p, l ) ->
     begin
       match p with
-      | TPfield f ->
-        list_of_one (fun b ->
-            let b = get_env b env in
-            Ids.fold
-              (fun i acc ->
-                 Envs.join acc
-                   ( constraint_env_tag_id i tag env)
-              ) (Blocks.get_field f b) Envs.bottom
-          ) l
-      | TPduprecord _ when tag = 0 ->
-        list_of_one (fun b -> constraint_env_tag_var b tag env ) l
+      | TPfield f -> Env env
+        (* cannot say a thing, as usual *)
+        (* list_of_one (fun b -> *)
+        (*     let b = get_env b env in *)
+        (*     Ids.fold *)
+        (*       (fun i acc -> *)
+        (*          Envs.join acc *)
+        (*            ( constraint_env_tag_id i tag env) *)
+        (*       ) (Blocks.get_field f b) Envs.bottom *)
+        (*   ) l *)
+      | TPduprecord _ when tag = 0 -> Env env
+        (* list_of_one (fun b -> constraint_env_tag_var b tag env ) l *)
       | _ -> Envs.bottom
     end
   | Constraint _ -> assert false
@@ -309,7 +360,7 @@ sig
      and type hedge_attribute = hattr
      and type vertex_attribute = vattr
      and type graph_attribute = gattr
-     and type abstract = Data.environment
+     and type abstract = Envs.t
 end
   = functor ( E : Entry ) ->
   struct
@@ -324,7 +375,7 @@ end
 
     let bottom _ = Envs.bottom
     let is_bottom _ = Envs.is_bottom
-    let is_leq _ = Envs.is_leq
+    let is_leq _ = Manipulation.is_leq
     let join_list _ = List.fold_left Envs.join Envs.bottom
     let abstract_init v = if v = E.inv then Envs.empty else Envs.bottom
     let widening _ = Envs.widening
@@ -401,18 +452,18 @@ end
           List.fold_left
             (fun (env,ids) c ->
                let env,d = constant env c in
-               let env,i = reg_data d env in
+               let env,i = reg_data d !!env in
                env,i::ids )
             (env,[]) l
         in
-        let a = Array.of_list (List.rev ids) in
+        let a = Array.of_list (List.rev_map Locs.singleton ids) in
         env, ( Blocks.singleton t a )
       | Const_float_array l ->
         let ids,env =
           List.fold_left
             (fun (ids,env) f ->
-               let env,id = reg_data (Floats.singleton f) env in
-               (id::ids, env)
+               let env,id = reg_data (Floats.singleton f) !!env in
+               ((Locs.singleton id)::ids, env)
             ) ([], env) l in
         env, Arrays.singleton ids ( Int_interv.cst (List.length l)) Pfloatarray
       | Const_immstring s -> env, Strings.singleton s
@@ -422,25 +473,26 @@ end
     let apply (hedge_id :hedge ) ( l : hedge_attribute ) ( envs : abstract array ) =
       incr apply_counter;
       let simpleout env = ( [| env |], [] ) in
-      let in_apply ( id, action) env =
-        let set x = set_env id x env
-        and get x = get_env x env
-        and geti x = get_ident x env
-        and getd x = get_data x env
-        and setd i x = set_data i x env
+      let in_apply ( tid, action) env =
+        let e = !!env in
+        let set x = set_env tid x e
+        (* and get x = get_env x env *)
+        and getis x = get_idents x e
+        (* and getd x = get_data x env *)
+        (* and setd i x = set_data i x e *)
         (* and vunit = Cp.singleton 0 *)
         and act d = Exprs.set d action
         in
-        let sa x = set ( act x ) in
-        let unit env = set_env id ( act (Cps.singleton 0)) env in
+        let sa x e = set_env tid ( act x ) e in
+        let unit env = sa (Cps.singleton 0) env in
         let dsaw msg =
-          let env = set ( act Data.top ) in
+          let env = !! ( set ( act Data.top ) ) in
           warn ~env msg
         in
         match action with
         | App | App_prep _ | App_return | App_exn
         | Alloc _ | Lazyforce _ | Ccall _ | Send _ -> assert false
-        | Var i -> sa (get i)
+        | Var i -> set_idents tid (getis i) e
         | Const c ->
           let env,d =
             try env, HedgeTbl.find constant_table hedge_id with
@@ -449,38 +501,47 @@ end
               HedgeTbl.add constant_table hedge_id d;
               env, d
           in
-          set_env id ( act d ) env
+          set_env tid ( act d ) !!env
         | Prim ( p, l ) ->
           begin
             match p, l with
-            | TPbuiltin, [i] -> sa ( builtin_of_id i )
+            | TPbuiltin, [i] -> sa ( builtin_of_id i ) e
             (* Operations on heap blocks *)
             | TPfield i, [b] ->
-              let ib = geti b in
-              let db = getd ib in
-              let db = ( Blocks.restrict ~has_field:i db) in
-              let ids = Blocks.get_field i db in
-              set
-                ( Exprs.add 
-                    ( Ids.fold
-                        (fun i d -> union (getd i) d )
-                        ids Data.bottom )
-                    action )
-            |> set_data ib db
+              on_tid (fun locb db e ->
+                  set_data locb (Blocks.restrict ~has_field:i db) e
+                  >? set_idents tid (Blocks.get_field i db)
+                ) b e
+            (*   let ib = geti b in *)
+            (*   let db = getd ib in *)
+            (*   let db = ( Blocks.restrict ~has_field:i db) in *)
+            (*   let ids = Blocks.get_field i db in *)
+            (*   set *)
+            (*     ( Exprs.add  *)
+            (*         ( Ids.fold *)
+            (*             (fun i d -> union (getd i) d ) *)
+            (*             ids Data.bottom ) *)
+            (*         action ) *)
+            (* |> set_data ib db *)
             | TPsetfield ( i, _ ), [b;v] ->
-              let ib = geti b in
-              setd ib ( Blocks.set_field i (geti v) (getd ib) )
-              |> unit
+              let locv = getis v in
+              on_tid (fun locb db e ->
+                  set_data locb (Blocks.sets_field i locv db) e )
+                b e
+              >? unit
 
             | TPfloatfield i, [b] -> dsaw "TODO: floatfield"
             | TPsetfloatfield i, [b;v] -> dsaw "TODO: setfloatfield"
             | TPduprecord (trepr,i), [r] -> dsaw "TODO: duprecord"
 
             (* Boolean not *)
-            | TPnot, [i] -> sa ( Bools.notb ( get i))
+            | TPnot, [i] -> on_tid (fun _ di e -> 
+                sa (Bools.notb di) e) i e
 
             (* Integer operations *)
-            | TPnegint, [i] -> sa ( Int.op1 Int_interv.uminus ( get i))
+            | TPnegint, [i] -> on_tid (fun _ di e ->
+                sa ( Int.op1 Int_interv.uminus di) e)
+                i e
             | TPaddint, [x;y]
             | TPsubint, [x;y]
             | TPmulint, [x;y]
@@ -491,35 +552,55 @@ end
             | TPxorint, [x;y]
             | TPlslint, [x;y]
             | TPlsrint, [x;y]
-            | TPasrint, [x;y] -> sa ( Int.op2 ( intop2_of_prim p) (get x) (get y))
+            | TPasrint, [x;y] ->
+              on_tid (fun _ dx e ->
+                  on_tid (fun _ dy e ->
+                      sa ( Int.op2 ( intop2_of_prim p) dx dy) e
+                    ) y e ) x e
             | TPintcomp c, [x;y] -> 
-              let res, x', y' = Int.comp c ( get x) ( get y) in
-              sa res
-              |> set_env x x'
-              |> set_env y y'
+              on_tid (fun locx dx e ->
+                  on_tid (fun locy dy e ->
+                      let res, x', y' = Int.comp c dx dy in
+                      sa res e
+                      >! set_data locx x'
+                      >! set_data locy y' )
+                    y e ) x e
             | TPoffsetint i, [x] ->
-              sa ( Int.op1 (Int_interv.addcst i) ( get x) )
+              on_tid (fun _ dx e ->
+                  sa (Int.op1 (Int_interv.addcst i) dx) e
+                ) x e
             | TPoffsetref i, [x] ->
-              let ix = geti x in
-              let b = getd ix in
-              let b = Blocks.restrict ~tag:0 ~size:1 b in
-              let ids = Blocks.get_field 0 b in
-              let env, ids =
-                Ids.fold
-                  (fun idbang (env,ids) ->
-                     let bang = get_data idbang env in
-                     let (env,idbang') =
-                       reg_data
-                         ( Exprs.set
-                             (Int.op1 (Int_interv.addcst i) bang)
-                             (Prim (TPoffsetref i, [x]))
-                         )
-                         env in
-                     env, Ids.add idbang' ids
-                  ) ids ( env, Ids.empty ) in
-              env
-              |> set_data ix ( act ( Blocks.make_basic 0 1 [| ids|] ) )
-              |> unit
+              let tid' = TId.dual tid in
+              on_tid (fun locx dx e ->
+                  let dx = Blocks.restrict ~tag:0 ~size:1 dx in
+                  Blocks.on_field (fun _ d e ->
+                      let d = act (Int.op1 (Int_interv.addcst i) d) in
+                      let nloc = Locations.of_tid tid' in
+                      set_data nloc d e
+                      >! set_data locx (Blocks.singleton 0 [|Locs.singleton nloc|])
+                    ) 0 dx e
+                ) x e
+                  
+              (* let ix = geti x in *)
+              (* let b = getd ix in *)
+              (* let b = Blocks.restrict ~tag:0 ~size:1 b in *)
+              (* let ids = Blocks.get_field 0 b in *)
+              (* let env, ids = *)
+              (*   Ids.fold *)
+              (*     (fun idbang (env,ids) -> *)
+              (*        let bang = get_data idbang env in *)
+              (*        let (env,idbang') = *)
+              (*          reg_data *)
+              (*            ( Exprs.set *)
+              (*                (Int.op1 (Int_interv.addcst i) bang) *)
+              (*                (Prim (TPoffsetref i, [x])) *)
+              (*            ) *)
+              (*            !!env in *)
+              (*        env, Ids.add idbang' ids *)
+              (*     ) ids ( env, Ids.empty ) in *)
+              (* env *)
+              (* >! set_data ix ( act ( Blocks.make_basic 0 1 [| ids|] ) ) *)
+              (* >! unit *)
             (*
 (* Float operations *)
 | TPintoffloat | TPfloatofint
@@ -531,26 +612,34 @@ end
 
             (* Array operations *)
             | TParraylength _, [x] ->
-              let a = get x in
-              sa ( Int.of_interv (Arrays.size a) )
+              on_tid (fun _ a e ->
+                  sa ( Int.of_interv (Arrays.size a) ) e) x e
             | TParrayrefu _, [a;_] ->
-              let ids = Arrays.get (get a) in
-              sa ( Data.union_ids env ids)
+              on_tid (fun _ a e ->
+                  set_idents tid (Arrays.get a) e
+                ) a e
             | TParraysetu _, [ai;_;i] ->
-              let ai = geti ai in
-              let ii = geti i in
-              let ad = act ( Arrays.set (getd ai) ii ) in
-              setd ai ad |> unit
+              on_tid (fun loca da e ->
+                  on_tid (fun loci _ e ->
+                      set_data loca (Arrays.add_field da loci) e
+                    ) i e
+                ) ai e
+              >? unit
             (* Test if the argument is a block or an immediate integer *)
-            | TPisint, [x] -> sa ( Int.is_int env (get x) )
+            | TPisint, [x] ->
+              on_tid (fun locx dx e ->
+                  sa ( Int.is_int env dx ) e
+                ) x e
             (* Test if the (integer) argument is outside an interval *)
             | TPisout, [m;i] ->
-              let im = geti m and ii = geti i in
-              let dm = getd im and di = getd ii in
-              let res, dm, di = Int.is_out dm di in
-              sa res
-              |> set_data im dm
-              |> set_data ii di
+              on_tid (fun locm dm e ->
+                  on_tid (fun loci di e ->
+                      let res, dm, di = Int.is_out dm di in
+                      sa res e
+                      >! set_data locm dm
+                      >! set_data loci di
+                    ) i e
+                ) m e
 
 (*
 (* Bitvect operations *)
@@ -594,15 +683,15 @@ end
 | TPbigstring_set_64 of bool *)
             (* Compile time constants *)
             | TPctconst c, [] ->
-              let open Lambda in
-              begin
-                match c with
-                | Big_endian -> sa ( Bools.of_bool Sys.big_endian )
-                | Word_size -> sa ( Int.singleton Sys.word_size )
-                | Ostype_unix -> sa ( Bools.of_bool Sys.unix )
-                | Ostype_win32 -> sa ( Bools.of_bool Sys.win32 )
-                | Ostype_cygwin -> sa ( Bools.of_bool Sys.cygwin )
-              end
+              sa
+                ( let open Lambda in
+                  match c with
+                  | Big_endian -> Bools.of_bool Sys.big_endian
+                  | Word_size -> Int.singleton Sys.word_size
+                  | Ostype_unix -> Bools.of_bool Sys.unix
+                  | Ostype_win32 -> Bools.of_bool Sys.win32
+                  | Ostype_cygwin -> Bools.of_bool Sys.cygwin
+                ) e
 (*
 (* byte swap *)
 | TPbswap16
@@ -611,16 +700,19 @@ end
             (* Function handlers *)
             | TPfunfield i, [f] ->
               (* at this point, f is unique *)
-              let x = Funs.field i (get f) env in
-              sa x
+              on_tid (fun _ d e ->
+                  set_idents tid (Funs.field i d) e
+                ) f e
             | TPgetfun fid, [] ->
-              let value = get fun_tid in
-              if Funs.has_fid fid value
-              then sa ( Funs.fid fid (get fun_tid ) )
-                   |> rm_env fun_tid
-              else Envs.bottom
-            | TPgetarg, [] -> sa ( get arg_tid )
-              |> rm_env arg_tid
+              on_tid (fun loc d e ->
+                  if Funs.has_fid fid d
+                  then sa (Funs.fid fid d) e
+                  else Envs.bottom
+                ) fun_tid e
+              >? rm_env fun_tid
+            | TPgetarg, [] ->
+              set_idents tid (getis arg_tid) e
+              >! rm_env arg_tid
             (* Lastly, if everything fails, it means there's still work to get done !*)
             | prim, _ ->
               let str = Format.asprintf "TODO: primitives %a !"
@@ -632,27 +724,30 @@ end
           (*   (fun pp id -> Print_data.print pp id env) id; *)
           begin
             match c with
-            | Ccp cp  -> constraint_env_cp_var id cp env
-            | Ctag tag -> constraint_env_tag_var id tag env
-            | Cbool b -> constraint_env_bool_var id b env
+            | Ccp cp  -> constraint_env_cp_var cp tid e
+            | Ctag tag -> constraint_env_tag_var tag tid e
+            | Cbool b -> constraint_env_bool_var b tid e
           end
         | Return id ->
           Format.printf "ret %a@."
             (fun ppf id -> Print_data.print ppf id env) id;
-          set_env ret_tid ( get_env id env ) env
-        | Retexn id -> set_env exn_tid ( get_env id env ) env
+          set_idents ret_tid (getis id) e
+          (* set_env ret_tid ( get_env id env ) env *)
+        | Retexn id -> set_idents exn_tid ( getis id ) e
       in
       let on_allocs l env =
         let env, l = List.fold_left
-          (fun (env,l) (id,a) ->
-             let (env,i) = reg_env id env in
-             (env, (i,a)::l))
+          (fun (env,l) (tid,a) ->
+            let loc = Locations.of_tid tid in
+            let env = set_idents tid (Locs.singleton loc) !!env in
+            (env, (loc,a)::l))
           (env,[]) l in
         List.fold_left
           (fun env -> function
-             | i, ( Alloc (p,l) as action ) ->
-               let l = List.map (fun id -> get_ident id env) l in
-               set_data i
+             | loc, ( Alloc (p,l) as action ) ->
+               let e = !!env in
+               let l = List.map (fun tid -> get_idents tid e) l in
+               set_data loc
                  ( Exprs.set
                      begin
                        match p with
@@ -662,12 +757,13 @@ end
                        | TPmakeblock ( tag, _) ->
                          let a = Array.of_list l in
                          Blocks.singleton tag a
-                     end action ) env
+                     end action ) e
              | _, _ -> assert false
           ) env l
       in
       assert ( Array.length envs = 1 );
       let env = envs.(0) in
+      let e = !!env in
       (* Array.fold_left Envs.join Envs.bottom envs in *)
       let rec aux e l =
         match l with
@@ -677,32 +773,33 @@ end
       match l with
       | [ _, App_prep ( f, x ) ] ->
         let env =
-          env
-          |> set_env fun_tid ( get_env f env )
-          |> set_env arg_tid ( get_env x env )
+          set_idents fun_tid ( get_idents f e ) e
+          >! set_idents arg_tid ( get_idents x e )
         in
         Format.printf "app_pre fun_tid %a@.arg_tid %a@."
           (fun ppf id -> Print_data.print ppf id env) fun_tid
           (fun ppf id -> Print_data.print ppf id env) arg_tid;
         ( [| env |], [] )
       | [ _, App ] ->
-        let f = get_env fun_tid env in
-        let l = Funs.extract_ids f in
-        Format.printf "apply %b@.%a@." (is_bottom f env)
-          (fun ppf () -> Print_data.print ppf fun_tid env) ();
+        let l =
+          fold_tid (fun _ d l ->
+              Funs.extract_ids d l
+            ) fun_tid [] e in
+        (* Format.printf "apply %b@.%a@." (is_bottom f env) *)
+        (*   (fun ppf () -> Print_data.print ppf fun_tid env) (); *)
         List.iter (fun f -> Format.printf "outfunction %a@." Function_id.print f) l;
         [| Envs.bottom; Envs.bottom |], l
-      | [ id, App_return ] -> simpleout ( set_env id ( get_env ret_tid env) env )
-      | [ id, App_exn ] -> simpleout ( set_env id ( get_env exn_tid env ) env )
+      | [ tid, App_return ] -> simpleout ( set_idents tid ( get_idents ret_tid e) e )
+      | [ tid, App_exn ] -> simpleout ( set_idents tid ( get_idents exn_tid e ) e )
       | [ id, Ccall (pd, l) ] ->
         let open Primitive in
         assert ( pd.prim_arity = List.length l );
         let envo, enve = Def_c_fun.get_envs pd l id env in
         [| envo; enve |], []
-      | [ id, ( Lazyforce _ as a )]
-      | [ id, ( Send (_, _) as a ) ] ->
+      | [ tid, ( Lazyforce _ as a )]
+      | [ tid, ( Send (_, _) as a ) ] ->
         print_endline "Unsupported Lazyforce and object method";
-        [|set_env id ( Exprs.set Data.top a ) env; Envs.bottom |], []
+        [|set_env tid ( Exprs.set Data.top a ) e; Envs.bottom |], []
       | [_, Alloc _] | _::_::_ -> [| on_allocs l env |], []
       | [ id, action] -> [| in_apply (id,action) env |], []
       | _ -> [|aux env l|], []

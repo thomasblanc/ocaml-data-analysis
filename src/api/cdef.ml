@@ -34,4 +34,4 @@ let restrain l d =
 let remove l d =
   aux Data.bottom d l
 
-let is_only l d env = Data.is_bottom env ( remove l d ) 
+let is_only l d = Data.is_bottom ( remove l d ) 

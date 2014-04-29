@@ -70,7 +70,7 @@ module Env = struct
       param : Data.Ids.t }
 
   type t =
-    { env : Data.environment;
+    { env : Envs.environment;
       prepared_call : prepared_call option }
 
   let get_union ids env =

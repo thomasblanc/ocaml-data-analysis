@@ -96,7 +96,7 @@ module Env = struct
   (*   Locs.fold (fun id v -> union (get_data id env) v) ids bottom *)
 
   let get_union_fids locs { env; _ } =
-    Access.fold_locs (fun _ -> Funs.extract_ids) locs [] env
+    Access.fold_locs (fun _ -> Funs.extract_ids) locs [] !!env
 
   let any_int =
     { Data.bottom with int = Int_interv.top }
@@ -111,18 +111,18 @@ module Env = struct
   let env_v env = { env; prepared_call = None }
 
   let set_env id data env =
-    {env with env = Access.set_env id data env.env}
+    {env with env = Access.set_env id data !!env.env}
 
   let set_data loc data env =
     {env with
      env =
        Access.on_loc
-         (fun loc _ env -> Access.set_data' loc data env)
+         (fun loc _ env -> Access.set_data loc data env)
          loc
-         env.env;
+         !!env.env;
     }
 
-  let get_idents tid env = Access.get_idents tid env.env
+  let get_idents tid env = Access.get_idents tid !!env.env
 
   let set_constraint tid constr { env; prepared_call } =
     let env =
@@ -132,7 +132,7 @@ module Env = struct
            Envs.join (Access.set_data loc v env) e )
         tid
         Envs.bottom
-        env
+        !!env
     in
     { env; prepared_call }
 
@@ -202,7 +202,7 @@ module Env = struct
                let env2 = Access.set_data loc closure_val abs.env in
                (Envs.join env2 env, merge_tabs tab used_closure)
              with Not_found -> acc
-          ) closure ( Envs.bottom, [||]) abs.env in
+          ) closure ( Envs.bottom, [||]) !!abs.env in
       { abs with env }, c
       (* let f = (get_union closure abs.env).f in *)
       (* if (Fm.is_empty f) *)

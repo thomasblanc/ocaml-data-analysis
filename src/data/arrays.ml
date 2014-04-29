@@ -8,7 +8,7 @@ let singleton l size akind =
     bottom with
     arrays =
       {
-        a_elems = List.fold_left (fun e i -> Locs.add i e) Locs.empty l;
+        a_elems = List.fold_left (fun res locs -> Locs.union locs res) Locs.empty l;
         a_size = size;
         a_gen = akind = Pgenarray;
         a_float = akind = Pfloatarray;

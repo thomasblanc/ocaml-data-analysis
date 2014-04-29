@@ -5,10 +5,10 @@ open Data
 type 'a locm = 'a Locm.t
 
 (* The environment *)
-type environment =
+type t =
   | Bottom
-  | Env of env_descr
-and env_descr = 
+  | Env of t'
+and t' = 
   {
     entries: locs TIdm.t;
     values : Data.t locm;
@@ -31,6 +31,21 @@ let empty =
 let no_bottom str f = function
   | Bottom -> Format.eprintf "Bottom error on %s@." str; assert false
   | Env e -> f e
+
+let (!!) = function
+  | Bottom -> assert false
+  | Env e -> e
+
+let (>!) e f = f (!!e)
+let (>?) e f = match e with
+  | Bottom -> Bottom
+  | Env e -> f e
+
+let (>>?) e def f = match e with
+  | Bottom -> def
+  | Env e -> f e
+
+let (!>) e = Env e
 
 (* Joining and widening helper *)
 
@@ -55,11 +70,40 @@ let join_or_widen (union: Data.t -> Data.t -> Data.t) e1 e2 =
 (* Environment joining *)
 
 let join e1 e2 = join_or_widen union e1 e2
+let (>+) = join
 
 (* Environment joining with widening *)
 
-let widening e1 e2 = join_or_widen widening e1 e2
+(* let widening e1 e2 = join_or_widen widening e1 e2 *)
 
+(* total location set *)
+
+module Atpls = Utils.Set.Make (
+  struct
+    type t = atpl
+    let compare = Pervasives.compare
+    let print = print_atpl
+  end)
+
+
+let widening e1 e2 =
+  let fold_helper loc e loct =
+    Locm.fold_key
+      (fun loc d (dt,loct) -> Data.union d dt, Atpls.add loc loct)
+      loc e.values (Data.bottom, loct)
+  in
+  match e1, e2 with
+  | Bottom, a | a, Bottom -> a
+  | Env e1, Env e2 ->
+    let entries = TIdm.merge merger_locs e1.entries e2.entries in
+    let values = Locm.fold_by_loc
+        (fun loc values ->
+           let d1, loct = fold_helper loc e1 Atpls.empty in
+           let d2, loct = fold_helper loc e2 loct in
+           let d3 = Data.widening d1 d2 in
+           Atpls.fold (fun loc values -> Locm.add loc d3 values) loct values
+        ) e1.values e2.values in
+    !> { entries; values; }
 
 
 

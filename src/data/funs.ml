@@ -12,11 +12,7 @@ let fid i fu =
 
 let mk i l =
   { bottom with
-    f = Fm.singleton i
-        ( Array.map
-            Locs.singleton
-            ( Array.of_list l )
-        );
+    f = Fm.singleton i ( Array.of_list l );
   }
 
 let extract_ids { f; _ } acc =

@@ -1,4 +1,4 @@
-let ppf = Format.std_formatter
+let ppf = Common_types.ppf
 
 open My_main_args
 

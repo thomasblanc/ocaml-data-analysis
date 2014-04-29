@@ -28,7 +28,7 @@ module M : functor ( E : Entry ) ->
        and type hedge_attribute = hattr
        and type vertex_attribute = vattr
        and type graph_attribute = gattr
-       and type abstract = Data.environment
+       and type abstract = Envs.t
   end
 
 val get_counter : unit -> int

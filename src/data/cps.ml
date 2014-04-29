@@ -12,7 +12,7 @@ let singleton i =
 
 let has v d = Ints.mem v d.cp || Int_interv.mem v d.int
 
-let is_one d env =
+let is_one d =
   let d = Int.import_cp d in
   (Int_interv.unique d.int) &&
   is_bottom { d with int = bottom.int }
