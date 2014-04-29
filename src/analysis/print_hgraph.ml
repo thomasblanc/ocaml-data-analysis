@@ -32,7 +32,7 @@ let print_hedge_attribute ppf hattr =
   in
   match hattr with
   | [] -> ()
-  | [i, hinfo] -> Format.fprintf ppf "%a <- %a" TId.print i aux hinfo
+  | [i, hinfo] -> Format.fprintf ppf "@[%a <- %a@]@," TId.print i aux hinfo
   | (_, hinfo) :: t ->
     aux ppf hinfo;
     List.iter (fun (_,hinfo) -> Format.fprintf ppf ", %a" aux hinfo)

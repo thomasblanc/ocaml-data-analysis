@@ -97,6 +97,7 @@ begin test "tmain"
  test_serialized = true
  tests =
  [
+  "ifs" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "ifs.ml" "-dot" "ifs" ] )
   "simple" ( test_args = [ "-counter" "-dtlambda" "myper.ml" "-dot" "myper" ] )
   "chain" ( test_args = [ "-counter" "-dtlambda" "myper.ml" "-open" "Myper" "a.ml" "-dot" "a" ] )
   "pervasives" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-dot" "pervasives" ] )
@@ -109,8 +110,12 @@ begin test "tmain"
   "minicycle" ( test_args = [ "-counter" "-dtlambda" "minicycle.ml" "-dot" "minicycle" ] )
   "loop_no_rec" ( test_args = [ "-counter" "-dtlambda" "loop_no_rec.ml" "-dot" "loop_no_rec" ] test_exit = 1 )
   "functions" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "functions.ml" "-dot" "functions" ] test_exit = 1 )
-  "semantics" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "semantics.ml" "-dot" "semantics" ] )
+  "booleans" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "booleans.ml" "-dot" "booleans" ] )
+  "integers" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "integers.ml" "-dot" "integers" ] )
+  "blocks" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "blocks.ml" "-dot" "blocks" ] )
   "option" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "option.ml" "-dot" "option" ] test_exit = 1 )
+  "semantics" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "semantics.ml" "-dot" "semantics" ] )
+  "applys" ( test_args = [ "-counter" "-dtlambda" "pervasives.ml" "-open" "Pervasives" "applys.ml" "-dot" "applys" ] )
  ]
 
 end

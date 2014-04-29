@@ -48,7 +48,7 @@ let list_of_one f = function
    Using the results of a "if" or "match" statement to restrain the environment
 *)
 
-let warn ~env msg = print_endline msg; Env env
+let warn ~env msg = Format.fprintf ppf "%s@." msg; Env env
 
 let hfold f d env =
   let es = d.expr in
@@ -264,7 +264,7 @@ and constraint_env_cp cp expr env =
       (*   if cp - i >= 0 *)
       (*   then constraint_env_cp_var x (cp-i) env *)
       (*   else Envs.bottom *)
-      | _, _ -> assert false
+      | _, _ -> Envs.bottom
     end
   | _ -> Env env
 
@@ -715,7 +715,7 @@ end
               >! rm_env arg_tid
             (* Lastly, if everything fails, it means there's still work to get done !*)
             | prim, _ ->
-              let str = Format.asprintf "TODO: primitives %a !"
+              let str = Format.asprintf "TODO: primitives %a !@."
                   Print_tlambda.primitive prim in
               dsaw str
           end
