@@ -108,7 +108,7 @@ struct
     S with type key = Ord.t =
   struct
     include Map.Make ( Ord )
-    let print f pp = iter (fun k e -> Ord.print pp k; f pp e)
+    let print f pp = iter (fun k e -> Format.fprintf pp "@[%a -> %a@]@ " Ord.print k f e)
     let print_sep fsep f pp s =
       if is_empty s
       then ()
@@ -153,7 +153,7 @@ struct
     S with type key = H.t =
   struct
     include Hashtbl.Make ( H )
-    let print f pp = iter (fun k e -> H.print pp k; f pp e)
+    let print f pp = iter (fun k e -> Format.fprintf pp "@[%a -> %a@]@ " H.print k f e)
     let print_sep fsep f pp s =
       let first = ref true in
       iter

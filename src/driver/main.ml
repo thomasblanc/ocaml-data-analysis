@@ -71,15 +71,14 @@ let () =
             ppf result;
           close_out oc
       end;
-      if Envs.is_bottom outv_env
-      then begin
-        Format.fprintf ppf "Unreachable output@."
-      end;
+      Format.fprintf ppf "=====@.Main exit env:@.%a@."
+        Print_data.print_env outv_env;
       if Envs.is_bottom exn_env
       then ()
       else
         begin
-          Format.pp_print_string ppf "I found something:\n";
+          Format.fprintf ppf "====@.I found something:@.%a@."
+            Print_data.print_env exn_env;
           Print_data.print
             ppf
             Common_types.exn_tid

@@ -192,8 +192,18 @@ module Locs : Set.S
     then (TIdm.find tid s, tid)
     else raise Not_found
 
-  let print pp s = TIdm.print AIdo.print pp s (* to correct ! *)
-  let print_sep f pp s = TIdm.print_sep f AIdo.print pp s
+  let print pp s = TIdm.iter (fun tid aido -> print_atpl pp (aido,tid)) s
+  let print_sep f pp s =
+    if TIdm.is_empty s
+    then ()
+    else
+      begin
+        let (tid,aido) = TIdm.min_binding s in
+        print_atpl pp (aido,tid);
+        TIdm.iter
+          (fun tid aido -> f pp;print_atpl pp (aido,tid))
+          (TIdm.remove tid s)
+      end
 end
 
 module Locm : sig
@@ -311,7 +321,16 @@ end = struct
           with Not_found -> id )
       aido acc
 
-  let print f pp m = TIdm.print (AIdm.print f) pp m
+  let print f pp m =
+    TIdm.iter
+      (fun tid aidm ->
+         AIdm.iter
+           (fun aid x ->
+              Format.fprintf pp "@[%a@ ->@ %a@]"
+              print_atpl (AIdo.of_aid aid, tid)
+              f x
+           ) aidm
+      ) m
   let print_sep fsep f pp s =
     TIdm.print_sep fsep (AIdm.print_sep fsep f) pp s
 

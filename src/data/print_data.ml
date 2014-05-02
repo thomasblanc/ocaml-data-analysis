@@ -83,7 +83,7 @@ let print_data pp d =
           (Ints.print_sep sep) d.cp;
       if not ( Tagm.is_empty d.blocks )
       then
-        fprintf pp "Blocks@.@[@ %a@ @]@."
+        fprintf pp "@[Blocks@ @[<2>%a@ @]@]@,"
           ( Tagm.print
               (fun pp im ->
                  fprintf pp "@[{@[<2>@ %a@]}@]@."
@@ -137,7 +137,7 @@ let print_loc pp loc =
 let print_tid' pp tid env =
   let locs = TIdm.find tid env.entries in
   Format.fprintf pp
-    "@[%a@ :@ @[{@[<2>%a@]}@]."
+    "@[%a@[@ :@ {@[<2>%a@]}@]@."
     TId.print tid
     Locs.print locs;
   locs
@@ -160,3 +160,11 @@ let print' pp tid env =
   print_until_done pp todo finished env
 
 let print pp tid = Envs.no_bottom "print" (print' pp tid)
+
+let print_env pp = function
+  | Bottom -> Format.pp_print_string pp "[[Bottom]]"
+  | Env { entries; values; } ->
+    Format.fprintf pp
+      "[[@[@[Entries@ :@[<2>@ %a@]@]@.@[Locations@ :@[<2>@ %a@]@]@]]]@."
+      (TIdm.print Locs.print) entries
+      (Locm.print print_data) values
