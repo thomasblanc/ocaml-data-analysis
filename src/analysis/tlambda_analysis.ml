@@ -494,14 +494,16 @@ end
         | Alloc _ | Lazyforce _ | Ccall _ | Send _ -> assert false
         | Var i -> set_idents tid (getis i) e
         | Const c ->
-          let env,d =
+          let env,loc =
             try env, HedgeTbl.find constant_table hedge_id with
             | Not_found ->
               let env, d = constant env c in
-              HedgeTbl.add constant_table hedge_id d;
-              env, d
+              let loc = Locations.of_tid tid in
+              let env = set_data loc (act d) !!env in
+              HedgeTbl.add constant_table hedge_id loc;
+              env, loc
           in
-          set_env tid ( act d ) !!env
+          set_idents tid (Locs.singleton loc) !!env
         | Prim ( p, l ) ->
           begin
             match p, l with
