@@ -135,6 +135,14 @@ let merge_loc loc e = Locm.fold_key (fun _ -> Data.union) loc e.values Data.bott
 (* boolean leq *)
 let lb a b = b || not a
 
+let array2_fold f acc a b =
+  assert (Array.length a = Array.length b);
+  let rec foldi acc n =
+    if n = Array.length a
+    then acc
+    else foldi (f acc a.(n) b.(n)) (succ n)
+  in
+  foldi acc 0
 
 let rec is_leq e1 e2 =
   match e1, e2 with
@@ -143,56 +151,63 @@ let rec is_leq e1 e2 =
   | Env e1, Env e2 -> is_leq' e1 e2
 
 and is_leq' e1 e2 =
-    try is_leq_env e1 e2
+    try let _ = is_leq_env e1 e2 in true
     with Not_found -> false
 
 and is_leq_env e1 e2 =
-  TIdm.for_all
-    (fun tid locs ->
+  TIdm.fold
+    (fun tid locs acc ->
        let locs2 = TIdm.find tid e2.entries in
-       is_leq_locs e1 e2 Atpls.empty locs locs2
-    ) e1.entries
+       is_leq_locs e1 e2 acc locs locs2
+    ) e1.entries Atpls.empty
 
 and is_leq_locs e1 e2 visited l1 l2 =
-  Locs.subset l1 l2 &&
-  Locs.for_all
-    (fun loc ->
-       Atpls.mem loc visited ||
-       let d1 = merge_loc loc e1 in
-       let d2 = merge_loc (Locs.find loc l2) e2 in
-       is_leq_data e1 e2 (Atpls.add loc visited) d1 d2 ) l1
+  if Locs.subset l1 l2
+  then Locs.fold
+      (fun loc visited ->
+         if Atpls.mem loc visited
+         then visited
+         else
+           let d1 = merge_loc loc e1 in
+           let d2 = merge_loc (Locs.find loc l2) e2 in
+           is_leq_data e1 e2 (Atpls.add loc visited) d1 d2
+      ) l1 visited
+  else raise Not_found
 
 and is_leq_data e1 e2 visited a b =
-  let ill = is_leq_locs e1 e2 visited in
-  b.top
-  || not a.top
-     && Int_interv.is_leq a.int b.int
-     && leq_simple a.float b.float
-     && leq_simple a.string b.string
-     && leq_simple a.i32 b.i32
-     && leq_simple a.i64 b.i64
-     && leq_simple a.inat b.inat
-     && Ints.subset a.cp b.cp
-     && Tagm.for_all
-       (fun k a ->
-          let b = Tagm.find k b.blocks in
-           Intm.for_all
-             (fun k a ->
+  let ill = is_leq_locs e1 e2 in
+  if
+    b.top
+    || not a.top
+       && Int_interv.is_leq a.int b.int
+       && leq_simple a.float b.float
+       && leq_simple a.string b.string
+       && leq_simple a.i32 b.i32
+       && leq_simple a.i64 b.i64
+       && leq_simple a.inat b.inat
+       && Ints.subset a.cp b.cp
+       && Int_interv.is_leq a.arrays.a_size b.arrays.a_size
+       && ( b.arrays.a_gen
+            || not a.arrays.a_gen
+               && lb a.arrays.a_float b.arrays.a_float
+               && lb a.arrays.a_addr b.arrays.a_addr
+               && lb a.arrays.a_int b.arrays.a_int
+          )
+  then
+    let visited = 
+      Tagm.fold
+        (fun k a visited ->
+           let b = Tagm.find k b.blocks in
+           Intm.fold
+             (fun k a visited ->
                 let b = Intm.find k b in
-                array2_forall ill a b
-             ) a
-      ) a.blocks
-     && ill a.arrays.a_elems b.arrays.a_elems
-     && Int_interv.is_leq a.arrays.a_size b.arrays.a_size
-     && ( b.arrays.a_gen
-          || not a.arrays.a_gen
-             && lb a.arrays.a_float b.arrays.a_float
-             && lb a.arrays.a_addr b.arrays.a_addr
-             && lb a.arrays.a_int b.arrays.a_int
-       )
-     && Fm.for_all
-       (fun k a ->
-            let b = Fm.find k b.f in
-            array2_forall ill a b
-       ) a.f
-
+                array2_fold ill visited a b
+             ) a visited
+        ) a.blocks visited in
+    let visited = ill visited a.arrays.a_elems b.arrays.a_elems in
+    Fm.fold
+      (fun k a visited ->
+         let b = Fm.find k b.f in
+         array2_fold ill visited a b
+      ) a.f visited
+  else raise Not_found
