@@ -1,4 +1,4 @@
-let print_hedge_attribute ppf hattr =
+let print_hedge_attribute pp hattr =
   let open Common_types in
   let aux ppf = function
     | Prim (prim, _) ->
@@ -32,10 +32,10 @@ let print_hedge_attribute ppf hattr =
   in
   match hattr with
   | [] -> ()
-  | [i, hinfo] -> Format.fprintf ppf "@[%a <- %a@]@," TId.print i aux hinfo
+  | [i, hinfo] -> Format.fprintf pp "@[%a <- %a@]" TId.print i aux hinfo
   | (_, hinfo) :: t ->
-    aux ppf hinfo;
-    List.iter (fun (_,hinfo) -> Format.fprintf ppf ", %a" aux hinfo)
+    aux pp hinfo;
+    List.iter (fun (_,hinfo) -> Format.fprintf pp ", %a" aux hinfo)
       t
 
 let print_attrhedge ppf h attr =
