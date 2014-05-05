@@ -173,7 +173,7 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
   let hset_of_hiset s = H.HedgeIntSet.fold (fun (_,v) set -> H.HedgeSet.add v set) s H.HedgeSet.empty
 
   let vertex_succ g v = hset_of_hiset (vertex_succ' g v)
-  let vertex_pred g v = hset_of_hiset (vertex_pred' g v)
+  (* let vertex_pred g v = hset_of_hiset (vertex_pred' g v) *)
 
   let hedge_succ' g hedge =
     assert(H.contains_hedge g.graph hedge);
@@ -187,7 +187,7 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
 
   let hset_of_array a = Array.fold_right H.VertexSet.add a H.VertexSet.empty
 
-  let hedge_pred g h = hset_of_array (hedge_pred' g h)
+  (* let hedge_pred g h = hset_of_array (hedge_pred' g h) *)
   let hedge_succ g h = hset_of_array (hedge_succ' g h)
 
   let hedge_attrib g hedge =
@@ -204,7 +204,7 @@ module StackGraph (T:T) (H : Hgraph with module T := T) (Stack:Stack_types.Stack
     let attrib = H.hedge_attrib g.graph hedge in
     let stack = Stack.push attrib.stack function_info.stack_elt in
 
-    let link_function g hedge stack ({subgraph} as function_info) =
+    let link_function g hedge stack ({subgraph;_} as function_info) =
       g.orig_graph <- StackMap.add stack function_info.f_graph g.orig_graph;
 
       if Array.length (hedge_pred' g hedge) <> Array.length subgraph.H.sg_input

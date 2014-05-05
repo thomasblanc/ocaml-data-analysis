@@ -1,4 +1,3 @@
-open Common_types
 open Constants
 open Locations
 open Data

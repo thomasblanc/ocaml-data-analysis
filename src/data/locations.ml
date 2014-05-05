@@ -23,9 +23,6 @@ module AId : Id = struct
     !init
 end
 
-type aid = AId.t
-
-
 module AIdo = struct
   type t = AId.t option
   let compare (a:t) (b:t) =
@@ -34,19 +31,11 @@ module AIdo = struct
     | None,None -> 0
     | Some _, None -> -1
     | None, Some _ -> 1
-  let hash (a:t) = Hashtbl.hash a
   let equal a b =
     match a, b with
     | Some a, Some b -> AId.equal a b
     | None, None -> true
     | _,_ -> false
-  let name _ = None
-  let to_string = function
-    | Some a -> AId.to_string a
-    | None -> "N"
-  let output fd = function
-    | Some a -> AId.output fd a
-    | None -> output_char fd 'N'
   let print ppf = function
     | Some a -> AId.print ppf a
     | None -> Format.pp_print_char ppf 'N'

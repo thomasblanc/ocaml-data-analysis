@@ -114,9 +114,9 @@ let is_bottom_simple = function
   | Top -> false
   | Constants c -> Constants.is_empty c
 
-let rec is_bottom
+let is_bottom
     { top; int; float; string; i32;
-      i64; inat; cp; blocks; arrays = { a_elems; a_size; }; f; } =
+      i64; inat; cp; blocks; arrays = { a_elems; a_size; _ }; f; expr; } =
   top = false &&
   Int_interv.is_bottom int && is_bottom_simple float &&
   is_bottom_simple string &&

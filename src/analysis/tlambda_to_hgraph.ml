@@ -86,8 +86,6 @@ type mod_desc =
 let ctrue = Constraint (Cbool true)
 let cfalse = Constraint (Cbool false)
 
-let const_unit = Lambda.Const_pointer 0
-
 module Is = Set.Make ( struct type t = int let compare (a:int) b = compare a b end )
 
 open Tlambda

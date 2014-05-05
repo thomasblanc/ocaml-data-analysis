@@ -68,24 +68,6 @@ let meet x y =
     and b = min b1 b2 in
     if a > b then None else Some ( a, b)
 
-let succl = function
-  | None -> None
-  | Some ( x, y) when x = y -> None
-  | Some ( x, y) -> Some (succ x, y)
-let predl = function
-  | None -> None
-  | Some ( x, y ) -> Some (pred x, y)
-let succr = function
-  | None -> None
-  | Some ( x, y) -> Some (x, succ y)
-let predl = function
-  | None -> None
-  | Some ( x, y) when x = y -> None
-  | Some ( x, y) -> Some (x, pred y)
-
-let union = join
-let inter = meet
-
 let cst c = Some (c,c)
 
 let at_least c = Some (c, maximum)

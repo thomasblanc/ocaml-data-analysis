@@ -43,7 +43,7 @@ struct
 
   let empty = { context = None; current = None }
 
-  let push { current } e =
+  let push { current; _ } e =
     { context = current;
       current = Some e }
 
@@ -62,7 +62,7 @@ struct
                   hash_option T.hash t.context)
 
   let print ppf = function
-    | { current = None } -> Format.fprintf ppf "empty stack"
+    | { current = None; _ } -> Format.fprintf ppf "empty stack"
     | { context = None; current = Some s } ->
       Format.fprintf ppf "(%a)" T.print s
     | { context = Some s2; current = Some s1 } ->
@@ -100,7 +100,7 @@ struct
   let hash { env; top } =
     Hashtbl.hash (Top.hash top, TopSet.cardinal env)
 
-  let print ppf { top } = Top.print ppf top
+  let print ppf { top; _ } = Top.print ppf top
 
 end
 

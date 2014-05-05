@@ -1,5 +1,4 @@
 open Data
-open Manipulation
 
 let set_true d =
   { d with

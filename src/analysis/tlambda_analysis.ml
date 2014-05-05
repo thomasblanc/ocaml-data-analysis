@@ -1,6 +1,5 @@
 open Common_types
 open Lambda
-open Tlambda
 open Tlambda_to_hgraph
 module G = G
 
@@ -40,9 +39,6 @@ let rev_comp = function
 let may_rev_comp c cp =
   if cp = 0 then rev_comp c else c
 
-let list_of_one f = function
-  | [x] -> f x
-  | _ -> assert false
 
 (* Constraint propagation :
    Using the results of a "if" or "match" statement to restrain the environment
@@ -71,9 +67,6 @@ and constraint_env_bool_folder b loc d (env:Envs.t') =
   if b
   then general Ifcond.can_be_true Ifcond.set_true
   else general Ifcond.can_be_false Ifcond.set_false
-
-and constraint_env_bool_locs b locs (env:Envs.t') =
-  on__locs (constraint_env_bool_folder b) locs env
 
 (* and constraint_env_bool_id b i env = *)
 (*   let d = get_data i env in *)
@@ -206,8 +199,8 @@ and constraint_env_cp_folder cp loc d env =
 (*     then general () *)
 (*     else Envs.bottom *)
 
-and constraint_env_cp_exprs cp d env =
-  hfold (constraint_env_cp cp) d env
+(* and constraint_env_cp_exprs cp d env = *)
+(*   hfold (constraint_env_cp cp) d env *)
 
 and constraint_env_cp cp expr env =
   assert(cp >= 0);
@@ -369,8 +362,8 @@ end
 
     open H
 
-    type hedge = h
-    type vertex = v
+    (* type hedge = h *)
+    (* type vertex = v *)
     type abstract = e
 
     let bottom _ = Envs.bottom
@@ -398,9 +391,6 @@ end
       }
 
     module Stack = Stack
-
-    let clone_vertex _ = E.mk_vertex ()
-    let clone_hedge _ = E.mk_hedge ()
 
     let constant_table = HedgeTbl.create 65536
 
@@ -470,7 +460,7 @@ end
     (* Data.singleton_string s *)
 
 
-    let apply (hedge_id :hedge ) ( l : hedge_attribute ) ( envs : abstract array ) =
+    let apply (hedge_id : h ) ( l : ha ) ( envs : abstract array ) =
       incr apply_counter;
       let simpleout env = ( [| env |], [] ) in
       let in_apply ( tid, action) env =
@@ -686,7 +676,7 @@ end
             (* Compile time constants *)
             | TPctconst c, [] ->
               sa
-                ( let open Lambda in
+                ( (* let open Lambda in *)
                   match c with
                   | Big_endian -> Bools.of_bool Sys.big_endian
                   | Word_size -> Int.singleton Sys.word_size

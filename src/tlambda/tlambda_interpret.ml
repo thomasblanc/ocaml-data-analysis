@@ -37,7 +37,7 @@ let get_env env i =
     assert false
 let set_env env i v = Idm.add i v env
 
-let rec assign_list e l1 l2 =
+let assign_list e l1 l2 =
   List.fold_left2 set_env e l1 l2
 
 let val_to_bool v = match v with
@@ -58,7 +58,7 @@ let match_failure = Exn val_unit (* This is indeed false *) (* TODO *)
 
 let rec tlambda (funs:fun_table) (env:env) = function
   | Tend i -> get_env env i, env
-  | Tlet { te_id; te_lam; te_in }-> 
+  | Tlet { te_id; te_lam; te_in; _ }-> 
     let v = tcontrol funs env te_lam in
     let env = set_env env te_id v in
     tlambda funs env te_in
@@ -73,7 +73,6 @@ let rec tlambda (funs:fun_table) (env:env) = function
 
 and structured_constant = function
   | Const_base c ->
-    let open Asttypes in
     begin
       match c with
       | Const_int i -> Int i

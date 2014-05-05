@@ -1,5 +1,5 @@
 exception Bad_file
-exception No_implementation
+(* exception No_implementation *)
 
 let () =
   Clflags.nopervasives := true;
@@ -41,11 +41,6 @@ let mli_file ppf sourcefile outputprefix =
   Optcompile.interface ppf sourcefile outputprefix
 
 let cmti_file _ _ _ = failwith ".cmti not implemented, please directly compile .mli"
-  
-
-let open_module s =
-  Compenv.implicit_modules := 
-    s :: !Compenv.implicit_modules
 
 let open_module s =
   Compenv.implicit_modules := 

@@ -1,6 +1,5 @@
 open Common_types
 open Locations
-open Data
 open Envs
 
 let ignore_bottom f e = e >? f

@@ -153,7 +153,6 @@ and tcontrol ppf = function
 
 and allocator ppf p =
   let open Asttypes in
-  let open Lambda in
   match p with
   | TPfun f -> fprintf ppf "fun %a" F.print f
   | TPmakeblock (tag, Immutable) ->
@@ -163,7 +162,6 @@ and allocator ppf p =
   | TPmakearray _ -> fprintf ppf "makearray "
 
 and primitive ppf p =
-  let open Asttypes in
   let open Lambda in
   match p with
   | TPgetfun f -> fprintf ppf "getfun %a" F.print f
