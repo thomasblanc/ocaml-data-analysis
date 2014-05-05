@@ -475,9 +475,8 @@ end
         in
         let sa x e = set_env tid ( act x ) e in
         let sda loc x e = set_data loc (act x) e in
-        let mkloc tid e =
-          let loc = Locations.of_tid tid in
-          set_ident tid loc e, loc
+        let mkl tid  = Locations.of_tid tid in
+        let seti = set_ident
         in
         let unit env = sa (Cps.singleton 0) env in
         let dsaw msg =
@@ -533,16 +532,17 @@ end
 
             (* Boolean not *)
             | TPnot, [i] ->
-              let e,loc = mkloc tid e in
+              let loc = mkl tid in
               on_tid (fun _ di e ->
-                  sda loc (Bools.notb di) e) i !!e
-
+                  sda loc (Bools.notb di) e) i e
+              >! seti tid loc
             (* Integer operations *)
             | TPnegint, [i] ->
-              let e,loc = mkloc tid e in
+              let loc = mkl tid in
               on_tid (fun _ di e ->
                 sda loc ( Int.op1 Int_interv.uminus di) e)
-                i !!e
+                i e
+              >! seti tid loc
             | TPaddint, [x;y]
             | TPsubint, [x;y]
             | TPmulint, [x;y]
@@ -554,25 +554,28 @@ end
             | TPlslint, [x;y]
             | TPlsrint, [x;y]
             | TPasrint, [x;y] ->
-              let e,loc = mkloc tid e in
+              let loc = mkl tid in
               on_tid (fun _ dx e ->
                   on_tid (fun _ dy e ->
                       sda loc ( Int.op2 ( intop2_of_prim p) dx dy) e
-                    ) y e ) x !!e
+                    ) y e ) x e
+              >! seti tid loc
             | TPintcomp c, [x;y] -> 
-              let e,loc = mkloc tid e in
+              let loc = mkl tid in
               on_tid (fun locx dx e ->
                   on_tid (fun locy dy e ->
                       let res, x', y' = Int.comp c dx dy in
                       sda loc res e
                       >! set_data locx x'
                       >! set_data locy y' )
-                    y e ) x !!e
+                    y e ) x e
+              >! seti tid loc
             | TPoffsetint i, [x] ->
-              let e,loc = mkloc tid e in
+              let loc = mkl tid in
               on_tid (fun _ dx e ->
                   sda loc (Int.op1 (Int_interv.addcst i) dx) e
-                ) x !!e
+                ) x e
+              >! seti tid loc
             | TPoffsetref i, [x] ->
               let tid' = TId.dual tid in
               on_tid (fun locx dx e ->
