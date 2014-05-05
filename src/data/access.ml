@@ -60,6 +60,7 @@ let set_env tid d env =
 
 let get_idents tid env = TIdm.find tid env.entries
 let set_idents tid locs env = !> { env with entries = TIdm.add tid locs env.entries }
+let set_ident tid loc env = set_idents tid (Locs.singleton loc) env
 
 let reg_data d env =
   let loc = loc_of_tid (TId.create ()) in
